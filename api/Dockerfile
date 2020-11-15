@@ -1,7 +1,5 @@
 FROM python:3.9-alpine
 
-MAINTAINER Cybagard "cybagard@pm.me"
-
 WORKDIR /api
 COPY ./requirements.txt .
 

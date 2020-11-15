@@ -1,7 +1,5 @@
 FROM python:3.9
 
-MAINTAINER Cybagard "cybagard@pm.me"
-
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /tmp
 
