@@ -7,13 +7,13 @@
 name: Anchore Container Scan
 on: push
 jobs:
-  Anchore-Build-Scan:
+  Anchore-Build-Scan-API:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout the code
       uses: actions/checkout@v2
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag localbuild/testimage:latest
+      run: docker build . --file api/Dockerfile --tag localbuild/testimage:latest
     - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
       uses: anchore/scan-action@main
       with:
