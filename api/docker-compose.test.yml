@@ -4,15 +4,15 @@ services:
     stdin_open: true
     tty: true
     build:
-      context: ./svr
-      dockerfile: Dockerfile
+      context: ../svr
+      dockerfile: ../svr/Dockerfile
     image: nsrllookup-svr
     volumes:
     - ./tests/hashes.txt:/usr/local/share/nsrlsvr/hashes.txt
 
   sut:
     build:
-      context: ./api
+      context: ""
       dockerfile: Dockerfile
     depends_on:
       - svr
@@ -25,7 +25,7 @@ services:
 
   api:
     build:
-      context: ./api
+      context: ""
       dockerfile: Dockerfile
     depends_on:
       - svr
