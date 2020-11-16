@@ -6,13 +6,13 @@ a single MD5 hash and returns "known" or "unkown".
 This docker service is based on [nsrlsvr](https://github.com/rjhansen/nsrlsvr) & 
 [nsrllookup-python](https://github.com/rjhansen/nsrllookup-python) by [rjhansen](https://github.com/rjhansen).
 
-##How to use
+## How to use
 
-###Build your own version
+### Build your own version
 You can use ```docker-compose.test.yml``` and ```docker-compose.prod.yml``` to build, 
 test and run your own nsrllookup service.
 
-###Use the official docker images (no need to build them)
+### Use the official docker images (no need to build them)
 
 1. Prepare the environment. (**do this before running any other services**)
 
