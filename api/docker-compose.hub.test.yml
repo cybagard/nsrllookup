@@ -6,9 +6,7 @@ services:
     - ./tests/hashes.txt:/usr/local/share/nsrlsvr/hashes.txt
 
   sut:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: cybagard/nsrllookup-api:latest
     depends_on:
       - svr
     command: sh -c "/wait && nosetests -w /api/tests --with-coverage --cover-package=."
