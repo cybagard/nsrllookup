@@ -3,12 +3,15 @@
 """Simple API to lookup any MD5 hash in the NSRL RDS hash set."""
 
 import re
+import os
 
 from flask import Flask, jsonify
 from waitress import serve
 from paste.translogger import TransLogger
 
 from nsrllookup import NSRLLookup
+
+SERVER = os.environ['SERVER']
 
 api = Flask(__name__)
 
@@ -24,7 +27,7 @@ def check(hash_value):
     validated_input = [match.group(1) for match in validate]
 
     if validated_input:
-        nsrl = NSRLLookup(server='svr')
+        nsrl = NSRLLookup(server=SERVER)
         hash_value = validated_input.pop()
         nsrl.add_hash_only(hash_value)
         result = nsrl.run_query()
