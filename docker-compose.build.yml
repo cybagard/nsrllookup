@@ -1,18 +1,26 @@
 version: "3"
 services:
   svr:
-    image: cybagard/nsrllookup-svr:latest
+    build:
+      context: ./svr
+      dockerfile: Dockerfile
+    image: nsrllookup-svr
     volumes:
       - ./nsrlsvr/:/usr/local/share/nsrlsvr/
 
   svr-prepare:
-    image: cybagard/nsrllookup-svr:latest
+    build:
+      context: ./svr
+      dockerfile: Dockerfile
+    image: nsrllookup-svr
     volumes:
       - ./nsrlsvr/:/usr/local/share/nsrlsvr/
     entrypoint: "/prepare-hash-set.sh"
 
   api:
-    image: cybagard/nsrllookup-api:latest
+    build:
+      context: ./api
+      dockerfile: Dockerfile
     depends_on:
       - svr
     command: sh -c "/wait && python /api/app.py"
