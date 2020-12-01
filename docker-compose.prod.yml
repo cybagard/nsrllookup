@@ -21,5 +21,6 @@ services:
       - WAIT_HOSTS_TIMEOUT=600
       - WAIT_SLEEP_INTERVAL=30
       - WAIT_HOST_CONNECT_TIMEOUT=30
+      - SERVER=svr
     ports:
       - 5000:5000
