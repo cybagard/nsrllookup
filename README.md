@@ -63,4 +63,4 @@ You can use ```docker-compose.build.yml``` to build, test and run your own nsrll
     
 ### API Route
 
-Send your MD5 hash to `http://hostname:3000/check/<hash_value>`
+Send your MD5 hash to `http://<hostname>:5000/check/<hash_value>`
