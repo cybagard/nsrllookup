@@ -1,17 +1,14 @@
 # coding: UTF-8
 
-"""Simple API to lookup any MD5 hash in the NSRL RDS hash set."""
+"""Simple API to lookup file digests in the nsrllookup Hash Set."""
 
+import logging
 import re
-import os
 
 from flask import Flask, jsonify
 from waitress import serve
-from paste.translogger import TransLogger
 
-from nsrllookup import NSRLLookup
-
-SERVER = os.environ['SERVER']
+logging.basicConfig(level=logging.INFO)
 
 api = Flask(__name__)
 
@@ -23,11 +20,13 @@ def ping():
 
 @api.route('/check/<hash_value>')
 def check(hash_value):
+    from nsrllookup import NSRLLookup
+
     validate = re.finditer(r'(?=(\b[A-Fa-f0-9]{32}\b))', hash_value.upper())
     validated_input = [match.group(1) for match in validate]
 
     if validated_input:
-        nsrl = NSRLLookup(server=SERVER)
+        nsrl = NSRLLookup()
         hash_value = validated_input.pop()
         nsrl.add_hash_only(hash_value)
         result = nsrl.run_query()
@@ -41,6 +40,6 @@ def check(hash_value):
 
 
 if __name__ == '__main__':
-    serve(TransLogger(api, setup_console_handler=False),
+    serve(api,
           host='0.0.0.0',
           port=5000)

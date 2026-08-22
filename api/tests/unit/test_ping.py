@@ -1,22 +1,6 @@
-# coding: UTF-8
-
-"""Unit tests"""
-
-import unittest
-
-from app import api
+"""Liveness test: the existing /ping route still responds."""
 
 
-class BasicTests(unittest.TestCase):
-    """Basic Test Class"""
-
-    def setUp(self):
-        self.api = api.test_client()
-        self.api.testing = True
-
-    def tearDown(self):
-        pass
-
-    def test_ping(self):
-        response = self.api.get('/ping')
-        self.assertEqual(response.status_code, 200)
+def test_ping(client):
+    response = client.get('/ping')
+    assert response.status_code == 200
