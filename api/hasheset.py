@@ -1,4 +1,4 @@
-"""Confirmed NIST RDS V3 on-disk layout and a minimal-set fixture builder.
+"""Confirmed NIST RDS V3 on-disk layout, the fixture builder, and the Hash Set.
 
 The reference data set V3 is a plain SQLite database. The Minimal set (the one
 nsrllookup serves) is a ``.db`` whose single per-file table, ``METADATA``,
@@ -8,15 +8,17 @@ UPPERCASE and the table has no standalone hash index, so a raw
 builds a per-algorithm hash->known index at ingest instead of querying the
 column directly (see ``docs/adr/0001-disk-based-v3-engine.md``).
 
-This module owns the schema constants and a fixture builder that produces a
-tiny, in-repo SQLite database with the same layout as the real Minimal set,
-so the lookup code path exercises identical column names and casing against a
-sample rather than an 18 GB download.
+This module owns the schema constants, a fixture builder that produces a tiny,
+in-repo SQLite database with the same layout as the real Minimal set, and the
+provisioned, queryable **Hash Set**: a per-algorithm index plus the
+**Provenance** (the **Set**, the **Release** date-version, and the applied
+**Delta releases**) that says exactly what is loaded.
 """
 
 import os
 import sqlite3
-from typing import List
+from typing import Any
+from typing import Dict
 from typing import Sequence
 from typing import Set
 
@@ -89,3 +91,68 @@ def known_digests(conn: sqlite3.Connection, algorithm: str) -> Set[str]:
     column = ALGORITHM_COLUMN[algorithm]
     cursor = conn.execute("SELECT {} FROM {}".format(column, TABLE))
     return {row[0] for row in cursor if row[0]}
+
+
+class Provenance:
+    """The identity of a loaded Hash Set: which **Set**, **Release** date-version,
+    and **Delta releases** it was built from. Surfaced in every Lookup Result and
+    on ``/health`` so an answer is only trustworthy through what it records.
+    """
+
+    def __init__(self, set_name: str, release: str,
+                 deltas: Sequence[str] = ()) -> None:
+        self.set_name = set_name
+        self.release = release
+        self.deltas = tuple(deltas)
+
+    def dataset(self) -> Dict[str, Any]:
+        return {
+            "set": self.set_name,
+            "release": self.release,
+            "deltas": list(self.deltas),
+        }
+
+
+class HashSet:
+    """A provisioned, queryable **Hash Set**: one full Release plus applied
+    **Delta releases**, with a per-algorithm **hash->known index** built at
+    ingest. V3 stores digests UPPERCASE with no standalone hash index, so the
+    per-request lookup is a dict membership test, not a full table scan
+    (see ``docs/adr/0001-disk-based-v3-engine.md``).
+    """
+
+    def __init__(self, path: str, provenance: Provenance) -> None:
+        self._path = path
+        self._provenance = provenance
+        self._index = {
+            algorithm: self._build_index(algorithm, path)
+            for algorithm in SUPPORTED_ALGORITHMS
+        }
+
+    @staticmethod
+    def _build_index(algorithm: str, path: str) -> Set[str]:
+        conn = sqlite3.connect(path)
+        try:
+            return known_digests(conn, algorithm)
+        finally:
+            conn.close()
+
+    @property
+    def provenance(self) -> Provenance:
+        return self._provenance
+
+    def is_known(self, algorithm: str, digest: str) -> bool:
+        """Membership at the data layer: is this UPPERCASE digest present for
+        ``algorithm``. Distinguishes **Known** from **Unknown**; well-formedness
+        (the **Invalid** status) is the lookup module's call, not the data
+        layer's.
+        """
+        return digest in self._index[algorithm]
+
+
+def provision(path: str, provenance: Provenance) -> HashSet:
+    """Ingest entry point: build the per-algorithm index over the Minimal
+    **Set** ``db`` at ``path`` and return a queryable **Hash Set** stamped with
+    its **Provenance**. The index is built here, once, not per request.
+    """
+    return HashSet(path, provenance)

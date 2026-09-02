@@ -13,15 +13,23 @@ re-paste the schema here — follow the spec.
 
 **Blocked by:** 05 (Provision fixture Minimal Set + index), 02 (Migrate test suite to modern runner)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `look_up(hash_set, digests, algorithm)` returns one **Lookup Result** per digest.
-- [ ] Each result carries **Known/Unknown/Invalid** status for its **Algorithm**.
-- [ ] Each result carries the **Set**, **Release**, and applied **Delta releases** that
-      answered (provenance).
-- [ ] **Unknown** (checked, absent) is distinct from **Invalid** (never well-formed for the
-      declared **Algorithm**).
-- [ ] Tests assert this behaviour at the lookup seam on the fixture **Hash Set**; the module
-      internal SQL is not tested.
+- [x] `look_up(hash_set, digests, algorithm)` returns one **Lookup Result** per digest.
+- [x] Each result carries **Known/Unknown/Invalid** status for its **Algorithm**.
+- [x] Each result carries the **Set**, **Release**, and applied **Delta releases** that
+       answered (provenance).
+- [x] **Unknown** (checked, absent) is distinct from **Invalid** (never well-formed for the
+       declared **Algorithm**).
+- [x] Tests assert this behaviour at the lookup seam on the fixture **Hash Set**; the module
+       internal SQL is not tested.
 
 ## Comments
+
+Delivered in `api/lookup.py`: `look_up(hash_set, digests, algorithm)` returning one
+**Lookup Result** per digest built to the spec's API-contract schema
+(`digest`/`algorithm`/`status`/`dataset`). `is_well_formed` separates **Invalid**
+(not well-formed for the declared **Algorithm**) from **Unknown** (checked, absent);
+provenance comes from `hash_set.provenance.dataset()`. Tested only at the lookup seam
+through `api/tests/unit/test_lookup.py` against the fixture **Hash Set**; the index/SQL
+internals are not touched.

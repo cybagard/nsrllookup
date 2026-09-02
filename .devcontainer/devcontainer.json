@@ -1,0 +1,19 @@
+{
+      "name": "nsrllookup",
+      "build": {
+         "context": "..",
+         "dockerfile": ".devcontainer/Dockerfile"
+         },
+      "workspaceFolder": "/workspace",
+      "customizations": {
+          "vscode": {
+              "settings": {
+                  "python.defaultInterpreterPath": "/usr/local/bin/python",
+                  "python.testing.pytestEnabled": true,
+                  "python.testing.pytestPath": "api/",
+                  "files.unicodeBOM": "never"
+             }
+          }
+      },
+      "remoteUser": "root"
+      }
