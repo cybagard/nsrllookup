@@ -45,18 +45,14 @@ applies **Delta releases** at ingest, and has no retired component left.
   spec/ADR/ticket history docs and as retirement-context comments in the compose
   files + README, which is correct.
 
-## Uncommitted working tree (this session's work, NOT yet committed)
-Modified: `api/app.py`, `api/hasheset.py`, `api/audit.py` (new),
-`api/docker-compose.hub.test.yml`, `api/Dockerfile`, `api/pytest.ini`,
-`api/conftest.py`, `README.md`, `docker-compose.build.yml`,
-`docker-compose.prod.yml`, ticket files `08`–`14`, `.scratch/.../handoff.md`.
-Deleted: `svr/` (3 files), `api/nsrllookup.py`,
-`api/tests/integration/test_hash_lookup.py`.
-New files: `api/audit.py`,
-`api/tests/integration/{test_widen_algorithms,test_audit_entries,
-  test_log_rejections,test_end_to_end}.py`, `api/tests/test_apply_delta.py`.
-Leave untracked (agent tooling, not the migration): `.agents/`, `.claude/`,
-`skills-lock.json`. `coverage.xml`/`.coverage` are gitignored build artifacts.
+## Committed
+Tickets 08–14 are committed at `2a5b904` on `main` (on top of `e02258a`, which
+covered 04–07 + devcontainer). The full RDS V3 migration is now on `main`:
+`74cf77d` → `e02258a` (04–07 + devcontainer) → `2a5b904` (08–14).
+
+Untracked and intentionally NOT committed (agent tooling, not the migration):
+`.agents/`, `.claude/`, `skills-lock.json`. `coverage.xml`/`.coverage` are
+gitignored build artifacts.
 
 ## Gotchas for next session
 - **Indentation quirk (recurring):** the source uses 4-space bodies; a docstring
@@ -71,8 +67,9 @@ Leave untracked (agent tooling, not the migration): `.agents/`, `.claude/`,
   (the only one was the legacy live test, deleted in ticket 13); harmless.
 
 ## Suggested next steps
-- Commit the working tree (see "Uncommitted working tree"), leaving agent tooling
-  untracked.
-- Optional follow-ups (out of this spec's scope): caller-supplied identity in the
-  **Audit Entry** (ADR-0004), auth toggle, and provisioning automation's
-  production story (multi-GB transport, delta scheduling).
+- Migration is complete and committed (`2a5b904`). Optional follow-ups (out of
+  this spec's scope): caller-supplied identity in the **Audit Entry** (ADR-0004),
+  an auth toggle, and provisioning automation's production story (multi-GB
+  transport, delta scheduling).
+- The `live` marker remains in `pytest.ini`/`conftest.py` but no test uses it;
+  can be pruned in a cleanup.
