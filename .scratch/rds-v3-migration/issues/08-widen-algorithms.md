@@ -7,14 +7,22 @@ still resolves to a single **Known** answer.
 
 **Blocked by:** 07 (`POST /check` + `/health` for MD5)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The per-Algorithm index is built for **SHA-1** and **SHA-256** as well as **MD5**.
-- [ ] `look_up` and `POST /check` accept **SHA-1** and **SHA-256**.
-- [ ] A digest **Known** under one **Algorithm** is not reported **Known** under another for
-      the same file (**Known** is per-**Algorithm**).
-- [ ] A **SHA-256** that NIST deduplicates across many files still resolves to one
-      **Known** answer.
-- [ ] **CRC-32** remains rejected as a lookup **Algorithm**.
+- [x] The per-Algorithm index is built for **SHA-1** and **SHA-256** as well as **MD5**.
+- [x] `look_up` and `POST /check` accept **SHA-1** and **SHA-256**.
+- [x] A digest **Known** under one **Algorithm** is not reported **Known** under another for
+       the same file (**Known** is per-**Algorithm**).
+- [x] A **SHA-256** that NIST deduplicates across many files still resolves to one
+        **Known** answer.
+- [x] **CRC-32** remains rejected as a lookup **Algorithm**.
 
 ## Comments
+
+The data/lookup/index layers were already algorithm-agnostic (iterating
+`SUPPORTED_ALGORITHMS`); ticket 08 adds the assertions. `api/tests/integration/
+test_widen_algorithms.py` proves the index is built for all three algorithms,
+SHA-1 & SHA-256 are accepted by `POST /check` in any case, a value **Known**
+under MD5 is never reported **Known** under SHA-256, a NIST-deduplicated
+SHA-256 shared across two rows resolves to a single **Known**, and CRC-32 is a
+400. (Fixture SHA-256 corrected to a 64-char value.)

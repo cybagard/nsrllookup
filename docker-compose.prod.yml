@@ -1,24 +1,19 @@
+# Single-service model (ADR-0001, ADR-0003): one API container that queries
+# the provisioned Minimal Set Hash Set directly from a mounted, read-only
+# volume. There is no separate nsrlsvr daemon -- the engine is "open the
+# .db and run a query". Provisioning the volume (mount + apply deltas) is a
+# one-time operational step done outside build/CI.
 services:
-  svr:
-    image: cybagard/nsrllookup-svr:latest
-    volumes:
-      - ./nsrlsvr/:/usr/local/share/nsrlsvr/
-
-  svr-prepare:
-    image: cybagard/nsrllookup-svr:latest
-    volumes:
-      - ./nsrlsvr/:/usr/local/share/nsrlsvr/
-    entrypoint: "/prepare-hash-set.sh"
-
   api:
-    image: cybagard/nsrllookup-api:latest
-    depends_on:
-      - svr
-    command: sh -c "/wait && python /api/app.py"
-    environment:
-      - WAIT_HOSTS=svr:9120
-      - WAIT_HOSTS_TIMEOUT=600
-      - WAIT_SLEEP_INTERVAL=30
-      - WAIT_HOST_CONNECT_TIMEOUT=30
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: nsrllookup-api
+    # The provisioned, queryable Hash Set is mounted read-only; the Audit
+    # Trail is mounted read-write so it is durable and append-only.
+    volumes:
+       - ./data/rds.db:/data/rds.db:ro
+       - ./data/audit:/var/log/nsrllookup
+    command: python /api/app.py
     ports:
-      - 5000:5000
+       - 5000:5000

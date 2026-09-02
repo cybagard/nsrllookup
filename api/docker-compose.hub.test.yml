@@ -1,16 +1,10 @@
+# Single-service test harness: build the API image and run the self-contained
+# (fixture-based) test suite inside it. No live server, no separate service --
+# the suite drives the app through Flask's test client against the fixture Hash
+# Set. This backs the CI test job.
 services:
-  svr:
-    image: cybagard/nsrllookup-svr:latest
-    volumes:
-     - ./tests/hashes.txt:/usr/local/share/nsrlsvr/hashes.txt
-
   sut:
-    image: cybagard/nsrllookup-api:latest
-    depends_on:
-     - svr
-    command: pytest --cov=.
-    environment:
-     - WAIT_HOSTS=svr:9120
-     - WAIT_HOSTS_TIMEOUT=300
-     - WAIT_SLEEP_INTERVAL=30
-     - WAIT_HOST_CONNECT_TIMEOUT=30
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m pytest --cov=. --cov-report=term-missing

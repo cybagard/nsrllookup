@@ -1,48 +1,15 @@
+# Build/test harness for the single-service model. Builds the API image and
+# runs the test suite; no nsrlsvr service. Provisioning the Hash Set volume
+# is a one-time operational step, never a build step.
 services:
-  svr-test:
-    build:
-      context: ./svr
-      dockerfile: Dockerfile
-    image: nsrllookup-svr
-    volumes:
-       - ./api/tests/hashes.txt:/usr/local/share/nsrlsvr/hashes.txt
-
-  svr:
-    build:
-      context: ./svr
-      dockerfile: Dockerfile
-    image: nsrllookup-svr
-    volumes:
-       - ./nsrlsvr/:/usr/local/share/nsrlsvr/
-
-  svr-prepare:
-    build:
-      context: ./svr
-      dockerfile: Dockerfile
-    image: nsrllookup-svr
-    volumes:
-       - ./nsrlsvr/:/usr/local/share/nsrlsvr/
-    entrypoint: "/prepare-hash-set.sh"
-
-  api-test:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    image: nsrllookup-api
-    command: pytest --cov=.
-
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
     image: nsrllookup-api
-    depends_on:
-       - svr
-    command: sh -c "/wait && python /api/app.py"
-    environment:
-       - WAIT_HOSTS=svr:9120
-       - WAIT_HOSTS_TIMEOUT=600
-       - WAIT_SLEEP_INTERVAL=30
-       - WAIT_HOST_CONNECT_TIMEOUT=30
+    volumes:
+        - ./data/rds.db:/data/rds.db:ro
+        - ./data/audit:/var/log/nsrllookup
+    command: python /api/app.py
     ports:
-       - 5000:5000
+        - 5000:5000

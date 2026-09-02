@@ -19,7 +19,7 @@ def pytest_addoption(parser):
           "--live",
           action="store_true",
           default=False,
-          help="run tests that require a live nsrlsvr / Hash Set",
+           help="run tests that require a live Hash Set",
      )
 
 

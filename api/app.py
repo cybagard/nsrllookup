@@ -1,23 +1,23 @@
 # coding: UTF-8
 
-"""HTTP layer over the lookup module (Seam 1).
+"""HTTP layer over the lookup module (Seam 1) + the Audit Trail (ADR-0004).
 
-``POST /check`` names one **Algorithm** and one or more **Digests** for a single
-**Lookup Session**, returning one **Lookup Result** per digest with full
-**provenance**. ``/health`` reports the loaded **Release** + applied **Delta
-releases** (or not-ready when no **Hash Set** is provisioned). The lookup
-contract and the **Lookup Result** shape live in
-``.scratch/rds-v3-migration/spec.md`` -> API contract.
-
-The retired MD5-only ``GET /check/<hash>`` socket route and ``nsrllookup``
-client are kept until ticket 13; the new ``POST /check`` is the contract going
-forward. The ``NSRLLookup`` import stays on-demand so ``from app import api``
-remains boot-safe without a live server.
+POST /check names one Algorithm and one or more Digests for a single
+Lookup Session, returning one Lookup Result per digest with full
+provenance, and records an Audit Entry for the session in the durable,
+append-only Audit Trail. /health reports the loaded Release + applied
+Delta releases (or not-ready when no Hash Set is provisioned). The
+lookup contract and the Lookup Result shape live in
+`.scratch/rds-v3-migration/spec.md` -> API contract. POST /check is the
+sole lookup contract; the retired MD5-only GET route and nsrllookup socket
+client were removed in ticket 13.
 """
 
 import logging
-import re
+from datetime import datetime
+from datetime import timezone
 
+from audit import AuditTrail
 from flask import Flask
 from flask import jsonify
 from flask import request
@@ -31,16 +31,39 @@ logging.basicConfig(level=logging.INFO)
 api = Flask(__name__)
 
 _hash_set = None
+_audit = AuditTrail()
 
 
 def configure(hash_set):
-    """Install the provisioned **Hash Set** the routes answer against."""
+    """Install the provisioned Hash Set the routes answer against."""
     global _hash_set
     _hash_set = hash_set
 
 
+def configure_audit(trail: AuditTrail) -> None:
+    """Install the Audit Trail sessions record to (injectable for tests)."""
+    global _audit
+    _audit = trail
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _dataset_block():
     return None if _hash_set is None else _hash_set.provenance.dataset()
+
+
+def _record_session(algorithm, results, results_produced=True):
+    """Append the Audit Entry for a finished/attempted session (ADR-0004)."""
+    _audit.record({
+        "timestamp": _now(),
+        "caller": AuditTrail.SERVICE_ID,
+        "algorithm": algorithm,
+        "results": results if results_produced else None,
+        "results_produced": results_produced,
+        "dataset": _dataset_block(),
+    })
 
 
 @api.route('/ping')
@@ -51,30 +74,35 @@ def ping():
 @api.route('/check', methods=['POST'])
 def check():
     body = request.get_json(silent=True)
-
+    
     if body is None or not isinstance(body, dict):
+        _record_session(None, None, results_produced=False)
         return jsonify({'error': 'malformed request body'}), 400
-
+    
     algorithm = body.get('algorithm')
     if algorithm is None or algorithm not in hasheset.SUPPORTED_ALGORITHMS:
+        _record_session(algorithm, None, results_produced=False)
         return jsonify({'error': 'unsupported algorithm'}), 400
-
+    
     raw = body.get('hashes')
     if raw is None:
         raw = [body['hash']] if 'hash' in body else []
     if isinstance(raw, str):
         raw = [raw]
     if not isinstance(raw, list):
+        _record_session(algorithm, None, results_produced=False)
         return jsonify({'error': 'malformed request body'}), 400
-
+    
     if _hash_set is None:
         return jsonify({'error': 'hash set not provisioned'}), 503
-
+    
     set_name = body.get('set')
     if set_name is not None and set_name != _hash_set.provenance.set_name:
+        _record_session(algorithm, None, results_produced=False)
         return jsonify({'error': 'unsupported set'}), 400
-
+    
     results = look_up(_hash_set, raw, algorithm)
+    _record_session(algorithm, results, results_produced=True)
     return jsonify({'results': results})
 
 
@@ -85,29 +113,7 @@ def health():
     return jsonify({'ready': True, 'dataset': _dataset_block()})
 
 
-@api.route('/check/<hash_value>')
-def check_legacy(hash_value):
-    """Retired MD5-only GET route; kept until ticket 13, on-demand import."""
-    from nsrllookup import NSRLLookup
-
-    validate = re.finditer(r'(?=(\b[A-Fa-f0-9]{32}\b))', hash_value.upper())
-    validated_input = [match.group(1) for match in validate]
-
-    if validated_input:
-        nsrl = NSRLLookup()
-        digest = validated_input.pop()
-        nsrl.add_hash_only(digest)
-        result = nsrl.run_query()
-
-        if digest in result['known']:
-            return jsonify({'result': 'true'})
-        else:
-            return jsonify({'result': 'false'})
-    else:
-        return jsonify({'result': 'invalid hash format'})
-
-
 if __name__ == '__main__':
     serve(api,
-          host='0.0.0.0',
-          port=5000)
+        host='0.0.0.0',
+        port=5000)
