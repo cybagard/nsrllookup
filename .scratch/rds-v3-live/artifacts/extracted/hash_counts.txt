@@ -1,0 +1,10 @@
+RDS 2026.09.1 Hash Counts
+
+Modern         : total of 952,500,508 files, 73,778,779 of which are distinct SHA-256 values.
+Modern Minimal : total of 441,621,230 files, 73,778,779 of which are distinct SHA-256 values.
+Legacy         : total of 332,488,906 files, 69,674,781 of which are distinct SHA-256 values.
+Legacy Minimal : total of 173,074,362 files, 69,674,781 of which are distinct SHA-256 values.
+Android        : total of 114,724,795 files, 37,331,740 of which are distinct SHA-256 values.
+Android Minimal: total of 104,788,235 files, 37,331,740 of which are distinct SHA-256 values.
+iOS            : total of 120,219,573 files, 34,091,620 of which are distinct SHA-256 values.
+iOS Minimal    : total of  97,516,958 files, 34,091,620 of which are distinct SHA-256 values.

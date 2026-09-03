@@ -1,0 +1,92 @@
+The following file contains all current expected dbhash values for all published
+RDS databases. For each published database, the list included represents the
+database and delta SQL files used, and combined in order, that will generate the
+correct dbhash values.
+
+
+------------ Modern -------------
+
+This dbhash value represents the dbhash output when combining the following
+Modern RDSv3 sets into a single SQLite database in the correct order.
+
+fa81b76a5a984afbaf8b77b0ebc17649d1ecd263 RDS_2026.09.1_modern.db
+        1. RDS_2026.03.1_modern.db
+        2. RDS_2026.06.1_modern_delta.sql
+        3. RDS_2026.09.1_modern_delta.sql
+
+
+-------- Modern Minimal ---------
+
+This dbhash value represents the dbhash output when combining the following
+Modern Minimal RDSv3 sets into a single SQLite database in the correct order.
+
+481e5f55f6d1ed63ea0f176779efc5cc5d53e52a RDS_2026.09.1_modern_minimal.db
+        1. RDS_2026.03.1_modern_minimal.db
+        2. RDS_2026.06.1_modern_minimal_delta.sql
+        3. RDS_2026.09.1_modern_minimal_delta.sql
+
+
+------------ Legacy -------------
+
+This dbhash value represents the dbhash output when combining the following
+Legacy RDSv3 sets into a single SQLite database in the correct order.
+
+052bcc035295296713cd4704717cdfe58924a211 RDS_2026.09.1_legacy.db
+        1. RDS_2026.03.1_legacy.db
+        2. RDS_2026.06.1_legacy_delta.sql
+        3. RDS_2026.09.1_legacy_delta.sql
+
+
+-------- Legacy Minimal ---------
+
+This dbhash value represents the dbhash output when combining the following
+Legacy Minimal RDSv3 sets into a single SQLite database in the correct order.
+
+b53c15404c9a55db0d302ae2666e600f2659ad6c RDS_2026.09.1_legacy_minimal.db
+        1. RDS_2026.03.1_legacy_minimal.db
+        2. RDS_2026.06.1_legacy_minimal_delta.sql
+        3. RDS_2026.09.1_legacy_minimal_delta.sql
+
+
+------------ Android ------------
+
+This dbhash value represents the dbhash output when combining the following
+Android RDSv3 sets into a single SQLite database in the correct order.
+
+85d0dfa0920fe37ac051ed9ff6c37047080dc4a5 RDS_2026.09.1_android.db
+        1. RDS_2026.03.1_android.db
+        2. RDS_2026.06.1_android_delta.sql
+        3. RDS_2026.09.1_android_delta.sql
+
+
+-------- Android Minimal --------
+
+This dbhash value represents the dbhash output when combining the following
+Android Minimal RDSv3 sets into a single SQLite database in the correct order.
+
+95ab4e6c48feef439ebeb20c95e066edff327294 RDS_2026.09.1_android_minimal.db
+        1. RDS_2026.03.1_android_minimal.db
+        2. RDS_2026.06.1_android_minimal_delta.sql
+        3. RDS_2026.09.1_android_minimal_delta.sql
+
+
+-------------- iOS --------------
+
+This dbhash value represents the dbhash output when combining the following
+iOS RDSv3 sets into a single SQLite database in the correct order.
+
+3e491afef53a1b0ac446f234e6c01a533ae64dae RDS_2026.09.1_ios.db
+        1. RDS_2026.03.1_ios.db
+        2. RDS_2026.06.1_ios_delta.sql
+        3. RDS_2026.09.1_ios_delta.sql
+
+
+---------- iOS Minimal ----------
+
+This dbhash value represents the dbhash output when combining the following
+iOS Minimal RDSv3 sets into a single SQLite database in the correct order.
+
+c561708269a9c6456fb1187217a37ad8637bcc50 RDS_2026.09.1_ios_minimal.db
+        1. RDS_2026.03.1_ios_minimal.db
+        2. RDS_2026.06.1_ios_minimal_delta.sql
+        3. RDS_2026.09.1_ios_minimal_delta.sql

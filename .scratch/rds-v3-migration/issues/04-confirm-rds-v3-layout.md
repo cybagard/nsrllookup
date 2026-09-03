@@ -26,3 +26,16 @@ docstring documents the `METADATA` table, the `crc32/md5/md5sha1/sha1/sha256/fil
 column order, the UPPERCASE digest storage, and the absence of a standalone hash index;
 `test_no_standalone_hash_index` asserts it, and `build_minimal_fixture_db` produces the
 tiny in-repo sample ticket 05 consumes.
+
+## Superseded
+
+This ticket "confirmed" a schema that turns out to be **synthetic**, not NIST's. The
+`rds-v3-live` effort byte-confirms NIST's **real** Minimal layout from the shipped
+`schema.sql` (release 2026.09.1): the per-file table is **`FILE`**, not `METADATA`;
+there is **no `md5sha1`** column; the filename column is **`file_name`**, not `filename`;
+and `FILE` also carries **`file_size`** and **`package_id`**. The real layout is
+`FILE(sha256, sha1, md5, crc32, file_name, file_size, package_id)` plus a
+`DISTINCT_HASH(sha256, sha1, md5, crc32)` **view**. See
+`../rds-v3-live/issues/01-confirm-real-schema.md` (resolved; answer + evidence in
+`../rds-v3-live/artifacts/`). This ticket's data-layer claim is superseded; its
+test-runner/migration work is not.

@@ -1,0 +1,8 @@
+# Heavy NIST binaries stay off git; small text evidence is committed.
+# The 18 GiB full Minimal set, curated db, and any SQLite db are operator
+# artifacts, not repo content.
+*.zip
+*.gz
+*.db
+*.sha
+*.bin

@@ -1,0 +1,9 @@
+RDS Version 2026.09.1 - September 2026
+"958da4132c609417d0e4ec02f311e2c092eba6b6","2026/09/01 2026.09.1 android delta"
+"fbe87a64f6965b72c81b1d857cd89e8a2312f844","2026/09/01 2026.09.1 android minimal delta"
+"56d4b3a2af94f8bee406f8dfa48aedbcc90d3096","2026/09/01 2026.09.1 ios delta"
+"1dafd24a6a9fccecae1a46acaaeb137d910346b0","2026/09/01 2026.09.1 ios minimal delta"
+"4a3471e5b0b6f149a777029dda1f1537b9ad640d","2026/09/01 2026.09.1 legacy delta"
+"f913bdf7afddb21a7cd54191c8abb73326971168","2026/09/01 2026.09.1 legacy minimal delta"
+"dbb3537d0cf177881f2d3ae23aaaf74d627db1f1","2026/09/01 2026.09.1 modern delta"
+"fc23ae7332b9188a089baf8fb53b9a6b463701d5","2026/09/01 2026.09.1 modern minimal delta"

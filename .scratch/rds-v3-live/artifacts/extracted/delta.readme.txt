@@ -1,0 +1,40 @@
+
+2026-09-01 - RDS Version 2026.09.1 Modern Minimal Delta
+
+Version 2026.09.1 of the RDS is contained in a single zip file.
+
+-- zip Contents 
+
+    RDS_2026.09.1_modern_minimal_delta.sql
+    RDS_2026.09.1_modern_minimal.schema.sql
+    readme.txt
+    signatures.txt
+
+RDS_2026.09.1_modern_minimal_delta.sql is a SQLite file
+intended to update the previously published full modern SQLite3
+database. This delta set is intended to bring the previous
+modern release up to date with new data collected by the NSRL
+since the previous modern publication.
+
+--
+
+If you have questions regarding the use of the NIST National
+Software Reference Library Reference Data Set, you will find
+current contact information given below and at
+http://www.nsrl.nist.gov .
+
+Hash values of the files in the NSRL RDS are available on
+the website to provide traceability, as the RDS may be
+freely copied to any media. The RDS is digitally signed to
+allow NIST to be able to verify that no changes have been
+made to its contents. As long as no modifications to the 
+contents have been made, a notice that NIST is the 
+originator of the contents must accompany each copy made. If
+modifications are made, references to NIST as the producer
+must be removed.
+
+       National Institute of Standards and Technology
+                     ATTN: NSRL Project
+                100 Bureau Drive, Stop 8970
+              Gaithersburg, MD 20899-8970 USA
+E-mail: nsrl@nist.gov Phone: 301-975-2874 FAX: 301-948-6213
