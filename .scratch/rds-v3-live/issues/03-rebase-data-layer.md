@@ -3,7 +3,9 @@
 **What to build:** the data layer reads NIST's **real** layout instead of the synthetic
 `METADATA(crc32, md5, md5sha1, sha1, sha256)` shape — a single red→green batch that
 re-words the data layer and **every fixture together** (the "make the easy change" step
-after 02 made the model explicit). The **Sidecar index** (per-Algorithm `hash→known`
+after 02 made the model explicit). It re-implements the **Set schema** term (`FILE` table +
+`DISTINCT_HASH` view, per ADR-0001's no-standalone-index rationale). The **Sidecar index**
+(per-Algorithm `hash→known`
 index) is built by **materialising the `DISTINCT_HASH` view** (~72M distinct digests),
 UPPERCASED, so membership is **case-agnostic**; `crc32` stays physically present but is
 **not** a supported lookup **Algorithm**. Fixtures that used the synthetic

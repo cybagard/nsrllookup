@@ -32,13 +32,16 @@ publishes quarterly: a full **Release** in March, and **Delta releases** in June
 September, December.
 
 **Delta release**:
-An incremental update that, applied against a prior full Release's database, reproduces
-the most current dataset, without re-fetching the full set.
+An incremental update in NIST's own form — an ordered `.sql` script of
+`INSERT`/`UPDATE`/`DELETE` statements — applied in order against a full Release's database
+to reproduce the most current dataset without re-fetching the full set. A delta applies only
+to the matching set.
 _Avoid_: patch, upgrade
 
 **Hash Set**:
-The single, current dataset nsrllookup has loaded and made queryable: one full **Release**
-plus any **Delta releases** applied on top of it, in one versioned database.
+The single current dataset nsrllookup has loaded and made queryable: one full **Release**
+plus any **Delta releases** applied on top of it, in one versioned database. A **Provisioner**
+produces it; the service loads it, read-only.
 _Avoid_: server, daemon, database
 
 **Digest**:
@@ -53,6 +56,28 @@ lookup is always per-algorithm: a file may be "known" under MD5 independently of
 it is "known" under SHA-256. An RDS row physically carries **CRC-32** as well, but
 nsrllookup does not accept CRC-32 lookups — it is a weak, non-forensic checksum.
 _Avoid_: digest (when meaning the algorithm), "crc32" (not a supported lookup)
+
+**Set schema**:
+The on-disk shape of a Minimal **Set**: a `FILE` table
+(`sha256, sha1, md5, crc32, file_name, file_size, package_id`) and a `DISTINCT_HASH`
+(`sha256, sha1, md5, crc32`) view over it. `crc32` is a physical column but not a lookup
+**Algorithm**.
+_Avoid_: METADATA table (the per-file table is `FILE`), md5sha1 (no such column),
+filename (the column is `file_name`)
+
+**Sidecar index**:
+nsrllookup's own membership index — the distinct digests materialised from the
+`DISTINCT_HASH` view (per **Algorithm**), persisted alongside the mounted Hash Set. It is
+replaced when a **Delta release** is applied, so a stale index never answers against newer
+data.
+_Avoid_: the raw FILE scan (the index is the view, not the ~430 M raw rows), the mounted
+database itself
+
+**dbhash**:
+NIST's dataset-integrity token for a **Release**: a hash of the final post-delta database,
+published per release. A forensic consumer re-verifies any **Lookup Result** against NIST's
+published `dbhashes.txt`.
+_Avoid_: the file's own digest (that is the Digest being looked up, not the dataset's)
 
 ### The lookup
 
@@ -75,8 +100,9 @@ _Avoid_: query (when meaning a whole request), "look up this file" (the unit is 
 **Lookup Result**:
 The answer for one Digest at one Algorithm, scoped to the Hash Set that answered it. It
 carries full provenance: the digest, its algorithm, the `Known`/`Unknown` status, the
-**Set** consulted, the **Release** (date-version), and which **Delta releases** were
-applied. This lets a forensic consumer know exactly what the answer was checked against.
+**Set** consulted, the **Release** (date-version), the applied **Delta releases** (ordered),
+and the final **dbhash** — enough to re-verify the answer against NIST's published
+`dbhashes.txt`.
 
 ### The service
 
@@ -88,9 +114,26 @@ authentication); every session is recorded in an **Audit Trail**.
 **Audit Entry**:
 One record of a completed **Lookup Session**: a timestamp, a caller identifier (a fixed
 service id for now), the Algorithm, each digest with its per-item
-`Known`/`Unknown`/`Invalid` status, and the **Release** + applied **Delta releases** that
-answered. The Audit Trail is the forensic guarantee for an open interface.
+`Known`/`Unknown`/`Invalid` status, and the **Set**, **Release**, applied **Delta releases**,
+and final **dbhash** that answered. The Audit Trail is the forensic guarantee for an open
+interface.
 _Avoid_: log line, hit (use Audit Entry)
+
+**Provisioner**:
+The operator-run, out-of-band step that builds a queryable **Hash Set**: fetch a **Release**
+and its ordered **Delta releases**, verify their integrity (zip SHA-1 sidecar, inner SHA-256
+signatures, and NIST's **dbhash**), apply the deltas in order, and write the **Hash Set**,
+a persisted **Sidecar index**, and a **Provisioning manifest**. It never runs at build or CI
+time, and the service never provisions for itself.
+_Avoid_: ingester, loader (at boot time, which the service does not do)
+
+**Provisioning manifest**:
+The small attestation the **Provisioner** writes alongside the **Hash Set**: the **Set**,
+the **Release**, the ordered **Delta releases**, and the integrity values (zip SHA-1, inner
+SHA-256 signatures, final **dbhash**). At startup the service is **ready** only when the
+manifest is present and its integrity still matches the mounted **Hash Set**.
+_Avoid_: a boot-time integrity check (the container trusts the verified mount, not a
+recomputed dbhash — see ADR-0006)
 
 **Audit Trail**:
 The durable, append-only log of every **Audit Entry** nsrllookup produces. Because the
