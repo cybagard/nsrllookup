@@ -13,11 +13,12 @@ KNOWN = {
 }
 
 
-def _row(filename, **digests):
-    row = {"crc32": "2E19F1E7", "md5": None, "md5sha1": None,
-        "sha1": None, "sha256": None, "filename": filename}
-    row.update(digests)
-    return row
+def _row(file_name, **digests):
+     row = {"crc32": "2E19F1E7", "md5": None,
+           "sha1": None, "sha256": None,
+            "file_name": file_name, "file_size": 0, "package_id": 0}
+     row.update(digests)
+     return row
 
 
 def _provision_realistic(tmp_path):

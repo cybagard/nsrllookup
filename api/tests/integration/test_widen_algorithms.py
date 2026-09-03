@@ -14,10 +14,10 @@ import hasheset
 from lookup import look_up
 
 KNOWN = {
-      "md5": "AD7B9C14083B52BC532FBA5948342B98",
-      "sha1": "3FA828B1A5F1D59CCE6D8A9BB2814F025F84B761",
-      "sha256": "A3F9BCA52E3D62E9E2C9F0E2F3D4C5B6A7E8F90A1B2C3D4E5F60718293A4B5C6",
-}
+       "md5": "AD7B9C14083B52BC532FBA5948342B98",
+       "sha1": "3FA828B1A5F1D59CCE6D8A9BB2814F025F84B761",
+       "sha256": "A3F9BCA52E3D62E9E2C9F0E2F3D4C5B6A7E8F90A1B2C3D4E5F60718293A4B5C6",
+ }
 
 
 def _provision(path, deltas=("2026.06.1",)):
@@ -36,10 +36,11 @@ def test_index_is_built_for_all_three_algorithms(tmp_path):
     """The per-Algorithm index exists for MD5, SHA-1 and SHA-256."""
     path = str(tmp_path / "fixtureset.db")
     hasheset.build_minimal_fixture_db(path, [
-            {"crc32": "2E19F1E7", "md5": KNOWN["md5"], "md5sha1": None,
-                 "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
-                  "filename": "known.bin"},
-             ])
+            {"crc32": "2E19F1E7", "md5": KNOWN["md5"],
+              "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
+               "file_name": "known.bin", "file_size": 11,
+                "package_id": 0},
+        ])
     hash_set = _provision(path)
     assert set(hasheset.SUPPORTED_ALGORITHMS) == {"md5", "sha1", "sha256"}
     assert hash_set.is_known("md5", KNOWN["md5"])
@@ -51,10 +52,11 @@ def test_sha1_and_sha256_lookup_via_http(tmp_path):
     """SHA-1 and SHA-256 are accepted by POST /check, in any case."""
     path = str(tmp_path / "fixtureset.db")
     hasheset.build_minimal_fixture_db(path, [
-            {"crc32": "2E19F1E7", "md5": KNOWN["md5"], "md5sha1": None,
-                 "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
-                  "filename": "known.bin"},
-             ])
+            {"crc32": "2E19F1E7", "md5": KNOWN["md5"],
+              "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
+               "file_name": "known.bin", "file_size": 11,
+                "package_id": 0},
+        ])
     app.configure(_provision(path))
     try:
         client = app.api.test_client()
@@ -76,14 +78,14 @@ def test_known_is_per_algorithm(tmp_path):
     path = str(tmp_path / "fixtureset.db")
     hasheset.build_minimal_fixture_db(path, [
             {"crc32": "2E19F1E7", "md5": "11111111111111111111111111111111",
-                 "md5sha1": None, "sha1": "A" * 40, "sha256": KNOWN["sha256"],
-                  "filename": "a.bin"},
-             ])
+              "sha1": "A" * 40, "sha256": KNOWN["sha256"],
+               "file_name": "a.bin", "file_size": 3, "package_id": 0},
+        ])
     hash_set = _provision(path)
     assert look_up(hash_set, ["11111111111111111111111111111111"],
-             'md5')[0]['status'] == 'known'
+                   'md5')[0]['status'] == 'known'
     assert look_up(hash_set, ["11111111111111111111111111111111"],
-             'sha256')[0]['status'] != 'known'
+                   'sha256')[0]['status'] != 'known'
 
 
 def test_sha256_dedup_resolves_to_single_known(tmp_path):
@@ -92,18 +94,18 @@ def test_sha256_dedup_resolves_to_single_known(tmp_path):
     path = str(tmp_path / "dedupset.db")
     hasheset.build_minimal_fixture_db(path, [
             {"crc32": None, "md5": "11111111111111111111111111111111",
-                 "md5sha1": None, "sha1": None, "sha256": shared,
-                  "filename": "file-a.bin"},
+              "sha1": None, "sha256": shared,
+               "file_name": "file-a.bin", "file_size": 1, "package_id": 0},
             {"crc32": None, "md5": "22222222222222222222222222222222",
-                 "md5sha1": None, "sha1": None, "sha256": shared,
-                  "filename": "file-b.bin"},
-             ])
+              "sha1": None, "sha256": shared,
+               "file_name": "file-b.bin", "file_size": 1, "package_id": 0},
+        ])
     results = look_up(_provision(path), [shared], 'sha256')
     assert results == [
             {"digest": shared, "algorithm": "sha256", "status": "known",
-             "dataset": {"set": "modern", "release": "2026.03.1",
-                   "deltas": ["2026.06.1"]}}
-             ]
+              "dataset": {"set": "modern", "release": "2026.03.1",
+                           "deltas": ["2026.06.1"]}}
+        ]
 
 
 def test_crc32_rejected_as_algorithm(tmp_path):
@@ -111,10 +113,11 @@ def test_crc32_rejected_as_algorithm(tmp_path):
     **Algorithm**."""
     path = str(tmp_path / "fixtureset.db")
     hasheset.build_minimal_fixture_db(path, [
-            {"crc32": "2E19F1E7", "md5": KNOWN["md5"], "md5sha1": None,
-                 "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
-                  "filename": "known.bin"},
-             ])
+            {"crc32": "2E19F1E7", "md5": KNOWN["md5"],
+              "sha1": KNOWN["sha1"], "sha256": KNOWN["sha256"],
+               "file_name": "known.bin", "file_size": 11,
+                "package_id": 0},
+        ])
     app.configure(_provision(path))
     try:
         response = app.api.test_client().post('/check',

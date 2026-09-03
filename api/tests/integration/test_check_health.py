@@ -25,8 +25,10 @@ def provisioned(tmp_path):
     """Install a fixture Hash Set so the routes answer against real data."""
     path = str(tmp_path / "fixtureset.db")
     hasheset.build_minimal_fixture_db(path, [
-         {"crc32": "2E19F1E7", "md5": KNOWN_MD5, "md5sha1": None,
-           "sha1": None, "sha256": None, "filename": "known.bin"},
+          {"crc32": "2E19F1E7", "md5": KNOWN_MD5,
+            "sha1": None, "sha256": None,
+            "file_name": "known.bin", "file_size": 11,
+             "package_id": 0},
         ])
     hset = hasheset.provision(path,
               Provenance("modern", "2026.03.1", ["2026.06.1"]))
