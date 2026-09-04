@@ -30,10 +30,10 @@ def _provision_realistic(tmp_path):
         _row("md5only.bin", md5="11111111111111111111111111111111"),
     ])
     base_set = hasheset.provision(base,
-        Provenance("modern", "2026.03.1"))
-    return hasheset.apply_delta(base_set, [_row("delta.bin",
-        md5=KNOWN["md5"], sha1=KNOWN["sha1"], sha256=KNOWN["sha256"])],
-        "2026.06.1")
+         Provenance("modern", "2026.03.1"))
+    delta_sql = hasheset.build_delta_sql([_row("delta.bin",
+         md5=KNOWN["md5"], sha1=KNOWN["sha1"], sha256=KNOWN["sha256"])])
+    return hasheset.apply_delta(base_set, delta_sql, "2026.06.1")
 
 
 def test_all_three_algorithms_answer_with_provenance(tmp_path):
