@@ -1,10 +1,11 @@
-# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–04 DONE (4/9), next is 05
+# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–05 DONE (5/9), next is 06
 
 two things to know: the **RDS V3 migration is complete and committed**, but it was
 built against a **synthetic** on-disk schema. The follow-up effort **`rds-v3-live`**
 re-bases the data layer onto NIST's **real** RDS V3 layout and makes the service
-deployable. As of this handoff, **tickets `01`–`04` are done and committed**;
-`05`–`09` remain. The suite is green and 4 of the spine's tickets are landed — not a
+deployable. As of this handoff, **tickets `01`–`05` are done**; `05` (the
+Provisioner) is landed in the **working tree, NOT yet committed**. `06`–`09`
+remain. The suite is green (54 / 98%) and 5 of the spine's tickets are in — not a
 dead end. The live spec now exists at `.scratch/rds-v3-live/spec.md` and
 `docs/adr/0005..0006` are written.
 
@@ -46,52 +47,85 @@ shipped `schema.sql`, release `2026.09.1`; evidence + 3 integrity layers in
 ## 3. `rds-v3-live` — DESIGN + PROGRESS
 
 Spec: `.scratch/rds-v3-live/spec.md` (written). ADRs `0005`/`0006` written + committed.
-**9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05`–`09`
-`ready-for-agent`.
+**9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05`
+**RESOLVED, in the working tree (uncommitted)**; `06`–`09` `ready-for-agent`.
 
 **Ticket spine (`.scratch/rds-v3-live/issues/`, 9):**
 `01` **DONE** `3ba267c` byte-confirm real `FILE`/`DISTINCT_HASH` schema from NIST
-`schema.sql` (evidence in `…/artifacts/extracted/`) → `02` **DONE** `9509ad0` domain
+`schema.sql` (evidence in `…/artifacts/`) → `02` **DONE** `9509ad0` domain
 model + ADR-0005/0006 (`CONTEXT.md` + `docs/adr/0005..0006`) → `03` **DONE** `36c0350`
 re-base data layer to `FILE`/`DISTINCT_HASH` + UPPERCASE/case-agnostic Sidecar index
 (one red→green batch; `hasheset.py` + every fixture, `40 passed / 98% coverage`) →
 `04` **DONE** `131598e` apply a Delta as NIST's ordered `.sql` (copy-on-apply +
 `sqlite3.executescript`, no CLI), rebuild Sidecar, refresh provenance, + no-cross-set
 guard; `build_delta_sql` is the fixture seam; `hasheset.py` modernised to PEP-8 +
-f-strings and is now lint-clean (`42 passed / 98%`) → `05` Provisioner (3-layer
-integrity; wizard-driven `make provision`/`verify`) → `06` provisioning manifest +
-readiness gate + per-result `dbhash` → fork: `07` real-data mechanics smoke (one-off on
-`RDS_2021.12.2_curated`, out of CI, ∥) `08` fixture deploy smoke (build → run →
-`/health`+`/check` green, ∥) `09` housekeeping (retire `ticket 15`, refresh README,
-`live`-marker already pruned at `d01b933`).
-**Next frontier: `05`** (Provisioner + 3-layer integrity). `07 ∥ 08 ∥ 09` fork off
-`06`.
+f-strings and is now lint-clean (`42 passed / 98%`) → `05` **DONE (UNCOMMITTED)**
+Provisioner + 3-layer integrity in new `api/provision.py` → `06` provisioning
+manifest + readiness gate + per-result `dbhash` → fork: `07` real-data mechanics
+smoke (one-off on `RDS_2021.12.2_curated`, out of CI, ∥) `08` fixture deploy smoke
+(build → run → `/health`+`/check` green, ∥) `09` housekeeping (retire `ticket 15`,
+refresh README, `live`-marker already pruned at `d01b933`).
+**Next frontier: `06`** (manifest readiness gate + per-result `dbhash`). `07 ∥ 08 ∥ 09`
+fork off `06`.
 
-**What landed in `03`+`04` (data layer, `api/hasheset.py`):**
-- `TABLE = "FILE"`, `COLUMNS = (sha256, sha1, md5, crc32, file_name, file_size,
-  package_id)`; `DISTINCT_HASH_VIEW = "DISTINCT_HASH"` built by
-   `build_minimal_fixture_db`; the index materialises the view (UPPERCASED);
-   `is_known` UPPERCASES the input → case-agnostic. `crc32` present, not a lookup
-   Algorithm. Synthetic `METADATA`/`md5sha1`/`filename` gone.
-- **`04` did the delta mechanism (this was left from `03`):** `apply_delta(base,
-  delta_sql, delta_release, set_name=None)` now runs NIST's ordered `.sql` against a
-   **copy** of the base via `sqlite3.executescript` (the `.read` mechanism, no CLI)
-   then rebuilds the Sidecar + refreshes provenance (deduped). No cross-set
-   application: a `set_name` ≠ base's is refused (`ValueError`). `build_delta_sql(rows)`
-   renders a Delta's `FILE` inserts as `BEGIN TRANSACTION; INSERT …; COMMIT` — the
-   fixture seam. The old row-dict `apply_delta` + `_copy_rows` are gone.
-- **`04` modernised `hasheset.py`**: standard PEP-8 4-space indent, f-strings, a
-   public `HashSet.path` accessor, a `COLUMN_TYPES` map for the fixture DDL →
-   `hasheset.py` is now **lint-clean** (was `W0212` + 2× `C0209`).
-- **Left for `05`/`06`**: `dbhash` (NIST external binary) + `Provisioning manifest`
-   + readiness gate. `Provenance.dataset()` still returns `set`/`release`/`deltas`;
-   `dbhash` + the per-delta `dbhash` chain are a `06` addition.
-- `lookup.py`/`app.py` **unchanged** — per-item `known/unknown/invalid` + `dataset`
-   provenance already correct; the shape they assert (`set`/`release`/`deltas`) is
-   unchanged by `03`/`04`. `dbhash` in the `dataset` block is a `06` addition.
+**What landed in `05` (Provisioner, `api/provision.py` — UNCOMMITTED):**
+- New Seam-3 module, **no new dependency** (stdlib `hashlib`/`json`/`re`). Three
+  integrity verifiers + the ordered apply + the manifest write.
+  - **Layer 1** `verify_zip_sha(zip, sidecar)`: zip SHA-1 == NIST `.sha`
+     sidecar; tamper/mismatch/unparseable refused.
+  - **Layer 2** `verify_signatures(signed_dir, signature)`: every inner file in
+     `signatures.txt` (`SHA256(<name>)= <hex>`) hashes to recorded value;
+     blank/comment lines skipped, missing/altered refused.
+  - **Layer 3** `verify_dbhash(db, published, dbhash)`: final post-delta db's
+     token == `dbhashes.txt` value. **`dbhash` injected** (ADR-0006, external
+     binary not re-implemented) → assertable on fixtures.
+  - `write_manifest`/`read_manifest`: the **Provisioning manifest** (set,
+     release, ordered deltas, final `dbhash`) as JSON in the writable data dir;
+     the readiness-gate record for `06`.
+  - `provision(base, set, release, deltas, published_dbhash, dbhash,
+     manifest_path)`: applies each `(release, delta_sql)` **in order** via
+     `hasheset.apply_delta` (04), verifies layer 3, writes the manifest;
+     **dbhash mismatch refuses** (`ValueError`, writes nothing).
+- **Decision log for `05` (grilled, locked):** (a) `dbhash` = **injected token
+   function** (not shelling out, binary absent); (b) "fetch" stays an **operator
+   step** — the Provisioner verifies+applies **local artifacts**, no download in
+    CI; (c) manifest written into `workspace` (operator's writable data dir);
+    (d) **this ticket writes the manifest only** — `dbhash` into `dataset()`/
+    `/health` + the boot-time manifest **readiness gate** are **`06`**.
+- **`pylintrc` change:** `too-many-positional-arguments` added to the existing
+   `too-many-*` disable block — it is the pylint-4 successor to the already-
+   disabled `too-many-arguments`; `provision()`'s 7-arg signature is the
+   orchestrator entry point.
+- **Not touched:** `app.py`, `lookup.py`, `hasheset.py` (06 will add the
+   `dbhash` field to `dataset()` + the readiness gate). The `dbhash`/`dbhashes.txt`
+   `481e5f55…` value and the 3-file `signatures.txt` are captured in
+   `.scratch/rds-v3-live/artifacts/extracted/`.
 
 ## 4. Gotchas for next session
 
+- **`provision.py` was written clean PEP-8 4-space, and this burned effort this
+   session.** The repo's *older* modules (`lookup.py`, `app.py`, `audit.py`, and
+   even some test files) use a quirky offset — docstring-opener at `5`, body at `4`
+  — that **compiles** but trips a strict 4-space indent check. The Write/Edit tool
+   **preserves the bytes you give**, so a new file can be written fully uniform
+  4-space (docstrings *and* bodies at 4) and it will compile + lint clean.
+   **Gotcha that cost time:** indent-helper literals like `" "` + a 4-wide string
+   silently produced 5/11 spaces (the quirk again) until a byte-level check
+   (`len(s)-len(s.lstrip(" "))` must be a multiple of 4) caught it. **Rule:** build
+   new files with `" " * level` helpers and verify every body line is a multiple of
+    4 before writing. `api/provision.py` and `api/tests/test_provision.py` are
+    clean 4-space; don't reformat the quirky modules, match their style.
+- **CI lint bar (CORRECTED):** CI's `test` job (`.github/workflows/test.yml`) runs
+   **`pytest --cov` only — no `pylint`/`flake8` in CI.** `pylint` is a manual,
+    in-container check. The repo's own test files don't pass a strict 4-space lint
+    (`test_check_health.py` ≈ 4.5/10; existing `W0311` everywhere), so don't
+    chase 10/10 on test files — the gate is `pytest`. `app.py` C0303/W1405 and the
+    `E0015`/`UserWarning` `pylintrc` quirk are pre-existing.
+- **`dbhash` binary is NOT installed locally** (`which dbhash` → not found). Ticket
+   `05` handled this by **injecting** the token function (ADR-0006) so layer 3 is
+    assertable on a fixture without the binary. Ticket `06` (readiness gate using the
+    manifest's recorded `dbhash`) likewise needs no local `dbhash` — the service
+   *trusts the mount* (ADR-0006), it does not recompute at boot.
 - **Git has NO committed `user.*` config.** Commit with env vars
    (`GIT_AUTHOR_NAME=cybagard`, `GIT_AUTHOR_EMAIL=67512030+cybagard@users.noreply.github.com`,
    `GIT_COMMITTER_*` the same). `git -c user.name=… -m …` **fails** (-c and -m cannot
@@ -142,16 +176,21 @@ readiness gate + per-result `dbhash` → fork: `07` real-data mechanics smoke (o
 
 ## 5. Current health + suggested next step
 
-- Suite (in-container, == CI `test` job): **42 passed, 0 skipped, 98% coverage**,
+- Suite (in-container, == CI `test` job): **54 passed, 0 skipped, 98% coverage**,
    exit 0.
-- Lint: **`hasheset.py` is 0 findings now** (the `04` modernisation cleared the prior
-   `W0212` + 2× `C0209`). The remaining module findings are pre-existing and untouched:
-   `app.py` C0303/W1405 (trailing whitespace / inconsistent quotes) and the `E0015`
-   `pylintrc` quirk; overall pylint ≈ `9.3`/`10`.
-- **Next: ticket `05`** — the **Provisioner** (3-layer integrity per ADR-0006): fetch →
-    verify (SHA-1 `.zip_sha` sidecar → inner `signatures.txt` SHA-256 → NIST `dbhash`
-    over the final post-delta db, matching `dbhashes.txt` `481e5f55…e52a`) → apply the
-    ordered deltas via `apply_delta`/`executescript` → write the queryable Hash Set +
-    Sidecar + **Provisioning manifest**. `dbhash` itself is **not installed** — a
-    verified stand-in is needed (see ADR-0006). `06` (manifest + readiness gate +
-    per-result `dbhash`) follows; `07 ∥ 08 ∥ 09` fork off `06`. Commit per tracer bullet.
+- Lint: **`provision.py` is 10.00/10, 0 findings** (clean PEP-8 4-space);
+    `test_provision.py` ≈ 9.82/10 (two long module-docstring lines only).
+     `hasheset.py` still 0 findings. Pre-existing untouched: `app.py` C0303/W1405
+     and the `E0015`/`UserWarning` `pylintrc` quirk.
+- **`05` is in the working tree, NOT committed** (`api/provision.py`,
+    `api/tests/test_provision.py`, the `pylintrc` one-liner, and the
+     `.scratch/rds-v3-live/issues/05-*.md` `resolved` state). The standing
+     instruction is to **pause after each bullet for confirmation before
+      committing** — commit is pending.
+- **Next: ticket `06`** — the **readiness gate + per-result `dbhash`**: extend
+    `Provenance.dataset()` (and `/health`) to carry the final `dbhash` from the
+     manifest, and make the service **ready only when the Provisioning manifest is
+     present and its integrity matches the mounted db** (ADR-0005), refusing serve
+     on mismatch. The manifest record already exists (`05`); `06` consumes it at
+     boot. `07 ∥ 08 ∥ 09` fork off `06`. Commit `05` first (one tracer bullet),
+     then `06`.
