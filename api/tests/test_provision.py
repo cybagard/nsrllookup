@@ -11,6 +11,7 @@ import hashlib
 
 from hasheset import build_delta_sql
 from hasheset import build_minimal_fixture_db
+from hasheset import verify_readiness
 
 from provision import provision
 from provision import read_manifest
@@ -174,6 +175,19 @@ def test_provision_applies_deltas_and_writes_manifest(tmp_path):
     assert record["dbhash"] == "deadbeef"
     assert set_obj.is_known("md5", new_md5)
     assert read_manifest(manifest) == record
+
+
+def test_provisioned_set_passes_readiness_gate(tmp_path):
+    """The written manifest matches the returned set's provenance (gate)."""
+    base = tmp_path / "base.db"
+    _base_db(base)
+    manifest = tmp_path / "manifest.json"
+    set_obj, _record = provision(
+        str(base), "modern", "2026.03.1", [],
+        published_dbhash="deadbeef", dbhash=lambda _p: "deadbeef",
+        manifest_path=manifest)
+    assert verify_readiness(read_manifest(manifest), set_obj) is True
+    assert set_obj.provenance.dbhash == "deadbeef"
 
 
 def test_provision_refuses_on_dbhash_mismatch(tmp_path):

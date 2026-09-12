@@ -31,13 +31,16 @@ logging.basicConfig(level=logging.INFO)
 api = Flask(__name__)
 
 _hash_set = None
+_manifest = None
 _audit = AuditTrail()
 
 
-def configure(hash_set):
-    """Install the provisioned Hash Set the routes answer against."""
+def configure(hash_set, manifest=None):
+    """Install the provisioned Hash Set + its manifest the routes answer against."""
     global _hash_set
+    global _manifest
     _hash_set = hash_set
+    _manifest = manifest
 
 
 def configure_audit(trail: AuditTrail) -> None:
@@ -52,6 +55,11 @@ def _now() -> str:
 
 def _dataset_block():
     return None if _hash_set is None else _hash_set.provenance.dataset()
+
+
+def _ready() -> bool:
+    """The mount is trusted only when its manifest agrees with it."""
+    return hasheset.verify_readiness(_manifest, _hash_set)
 
 
 def _record_session(algorithm, results, results_produced=True):
@@ -96,11 +104,15 @@ def check():
     if _hash_set is None:
         return jsonify({'error': 'hash set not provisioned'}), 503
     
+    if not _ready():
+        _record_session(algorithm, None, results_produced=False)
+        return jsonify({'error': 'not ready'}), 503
+
     set_name = body.get('set')
     if set_name is not None and set_name != _hash_set.provenance.set_name:
         _record_session(algorithm, None, results_produced=False)
         return jsonify({'error': 'unsupported set'}), 400
-    
+
     results = look_up(_hash_set, raw, algorithm)
     _record_session(algorithm, results, results_produced=True)
     return jsonify({'results': results})
@@ -108,7 +120,7 @@ def check():
 
 @api.route('/health')
 def health():
-    if _hash_set is None:
+    if not _ready():
         return jsonify({'ready': False})
     return jsonify({'ready': True, 'dataset': _dataset_block()})
 

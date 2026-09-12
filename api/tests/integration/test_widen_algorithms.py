@@ -57,7 +57,8 @@ def test_sha1_and_sha256_lookup_via_http(tmp_path):
                "file_name": "known.bin", "file_size": 11,
                 "package_id": 0},
         ])
-    app.configure(_provision(path))
+    hset = _provision(path)
+    app.configure(hset, hset.provenance.dataset())
     try:
         client = app.api.test_client()
         assert _results(client, 'sha1', [KNOWN['sha1']])[0]['status'] == 'known'
@@ -102,10 +103,10 @@ def test_sha256_dedup_resolves_to_single_known(tmp_path):
         ])
     results = look_up(_provision(path), [shared], 'sha256')
     assert results == [
-            {"digest": shared, "algorithm": "sha256", "status": "known",
-              "dataset": {"set": "modern", "release": "2026.03.1",
-                           "deltas": ["2026.06.1"]}}
-        ]
+              {"digest": shared, "algorithm": "sha256", "status": "known",
+                "dataset": {"set": "modern", "release": "2026.03.1",
+                             "deltas": ["2026.06.1"], "dbhash": None}}
+          ]
 
 
 def test_crc32_rejected_as_algorithm(tmp_path):

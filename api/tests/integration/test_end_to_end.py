@@ -7,10 +7,12 @@ import hasheset
 from lookup import look_up
 
 KNOWN = {
-    "md5": "AD7B9C14083B52BC532FBA5948342B98",
-    "sha1": "3FA828B1A5F1D59CCE6D8A9BB2814F025F84B761",
-    "sha256": "A3F9BCA52E3D62E9E2C9F0E2F3D4C5B6A7E8F90A1B2C3D4E5F60718293A4B5C6",
+     "md5": "AD7B9C14083B52BC532FBA5948342B98",
+     "sha1": "3FA828B1A5F1D59CCE6D8A9BB2814F025F84B761",
+     "sha256": "A3F9BCA52E3D62E9E2C9F0E2F3D4C5B6A7E8F90A1B2C3D4E5F60718293A4B5C6",
 }
+
+DBHASH = "deadbeef"
 
 
 def _row(file_name, **digests):
@@ -30,7 +32,7 @@ def _provision_realistic(tmp_path):
         _row("md5only.bin", md5="11111111111111111111111111111111"),
     ])
     base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+          Provenance("modern", "2026.03.1", dbhash=DBHASH))
     delta_sql = hasheset.build_delta_sql([_row("delta.bin",
          md5=KNOWN["md5"], sha1=KNOWN["sha1"], sha256=KNOWN["sha256"])])
     return hasheset.apply_delta(base_set, delta_sql, "2026.06.1")
@@ -39,17 +41,18 @@ def _provision_realistic(tmp_path):
 def test_all_three_algorithms_answer_with_provenance(tmp_path):
     """Each algorithm answers known/unknown/invalid with full provenance."""
     hash_set = _provision_realistic(tmp_path)
-    app.configure(hash_set)
+    app.configure(hash_set, hash_set.provenance.dataset())
     try:
         client = app.api.test_client()
         for algo in ("md5", "sha1", "sha256"):
             data = client.post("/check", json={
-                "algorithm": algo, "hashes": [KNOWN[algo]]}).get_json()
+                  "algorithm": algo, "hashes": [KNOWN[algo]]}).get_json()
             result = data["results"][0]
             assert result["status"] == "known"
             assert result["algorithm"] == algo
             assert result["dataset"] == {
-                "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"]}
+                  "set": "modern", "release": "2026.03.1",
+                   "deltas": ["2026.06.1"], "dbhash": DBHASH}
     finally:
         app.configure(None)
 
@@ -57,12 +60,13 @@ def test_all_three_algorithms_answer_with_provenance(tmp_path):
 def test_delta_refreshed_health(tmp_path):
     """Health reports the refreshed release + delta after the apply."""
     hash_set = _provision_realistic(tmp_path)
-    app.configure(hash_set)
+    app.configure(hash_set, hash_set.provenance.dataset())
     try:
         data = app.api.test_client().get("/health").get_json()
         assert data["ready"] is True
         assert data["dataset"] == {
-            "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"]}
+             "set": "modern", "release": "2026.03.1",
+              "deltas": ["2026.06.1"], "dbhash": DBHASH}
     finally:
         app.configure(None)
 
@@ -71,7 +75,7 @@ def test_audit_trail_populated_including_rejections(tmp_path):
     """The trail holds success + rejection entries."""
     hash_set = _provision_realistic(tmp_path)
     log = str(tmp_path / "audit.log")
-    app.configure(hash_set)
+    app.configure(hash_set, hash_set.provenance.dataset())
     app.configure_audit(audit.AuditTrail(log))
     try:
         client = app.api.test_client()

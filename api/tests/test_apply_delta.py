@@ -34,7 +34,7 @@ def test_apply_delta_yields_updated_hash_set(tmp_path):
            _row("md5only.bin", "11111111111111111111111111111111"),
        ])
      base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+         Provenance("modern", "2026.03.1", dbhash="deadbeef"))
      new_md5 = hashlib.md5(b"delta file").hexdigest().upper()
      updated = _apply(base_set, [_row("delta.bin", new_md5)], "2026.06.1")
      assert updated.is_known("md5", new_md5)
@@ -47,12 +47,12 @@ def test_apply_delta_refreshes_provenance(tmp_path):
      base = str(tmp_path / "base.db")
      hasheset.build_minimal_fixture_db(base, [_row("base.bin", KNOWN_MD5)])
      base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+         Provenance("modern", "2026.03.1", dbhash="deadbeef"))
      updated = _apply(base_set, [_row("delta.bin", KNOWN_MD5)], "2026.06.1")
      assert updated.provenance.release == "2026.03.1"
      assert updated.provenance.deltas == ("2026.06.1",)
      assert updated.provenance.dataset() == {
-          "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"]}
+          "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"], "dbhash": "deadbeef"}
 
 
 def test_apply_delta_leaves_base_untouched(tmp_path):
@@ -60,7 +60,7 @@ def test_apply_delta_leaves_base_untouched(tmp_path):
      base = str(tmp_path / "base.db")
      hasheset.build_minimal_fixture_db(base, [_row("base.bin", KNOWN_MD5)])
      base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+         Provenance("modern", "2026.03.1", dbhash="deadbeef"))
      new_md5 = hashlib.md5(b"delta file").hexdigest().upper()
      _apply(base_set, [_row("delta.bin", new_md5)], "2026.06.1")
      assert base_set.is_known("md5", KNOWN_MD5)
@@ -72,7 +72,7 @@ def test_delta_refused_on_mismatched_set(tmp_path):
      base = str(tmp_path / "base.db")
      hasheset.build_minimal_fixture_db(base, [_row("base.bin", KNOWN_MD5)])
      base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+         Provenance("modern", "2026.03.1", dbhash="deadbeef"))
      delta_sql = hasheset.build_delta_sql([_row("delta.bin", KNOWN_MD5)])
      try:
          hasheset.apply_delta(base_set, delta_sql, "2026.06.1",
@@ -87,12 +87,12 @@ def test_health_reports_refreshed_provenance(tmp_path):
      base = str(tmp_path / "base.db")
      hasheset.build_minimal_fixture_db(base, [_row("base.bin", KNOWN_MD5)])
      base_set = hasheset.provision(base,
-         Provenance("modern", "2026.03.1"))
+         Provenance("modern", "2026.03.1", dbhash="deadbeef"))
      updated = _apply(base_set, [_row("delta.bin", KNOWN_MD5)], "2026.06.1")
-     app.configure(updated)
+     app.configure(updated, updated.provenance.dataset())
      try:
           data = app.api.test_client().get("/health").get_json()
           assert data["dataset"] == {
-               "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"]}
+               "set": "modern", "release": "2026.03.1", "deltas": ["2026.06.1"], "dbhash": "deadbeef"}
      finally:
           app.configure(None)

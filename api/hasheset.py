@@ -96,19 +96,22 @@ def known_digests(conn: sqlite3.Connection,
 
 
 class Provenance:
-    """Identity of a loaded Hash Set: Set, Release, applied Deltas."""
+    """Identity of a loaded Hash Set: Set, Release, Deltas, dbhash."""
 
     def __init__(self, set_name: str, release: str,
-                 deltas: Sequence[str] = ()) -> None:
+                 deltas: Sequence[str] = (),
+                 dbhash: str | None = None) -> None:
         self.set_name = set_name
         self.release = release
         self.deltas = tuple(deltas)
+        self.dbhash = dbhash
 
     def dataset(self) -> Dict[str, Any]:
         return {
              "set": self.set_name,
              "release": self.release,
              "deltas": list(self.deltas),
+             "dbhash": self.dbhash,
          }
 
 
@@ -183,8 +186,30 @@ def apply_delta(base: HashSet, delta_sql: str,
     if delta_release not in updated:
         updated.append(delta_release)
     provenance = Provenance(base.provenance.set_name,
-                            base.provenance.release, updated)
+                            base.provenance.release, updated,
+                            base.provenance.dbhash)
     return HashSet(new_path, provenance)
+
+
+def verify_readiness(manifest, hash_set: "HashSet") -> bool:
+    """The mount is trusted only when its manifest agrees with it.
+
+    The service is ready when a Provisioning manifest is present and its
+    recorded identity -- the Set, the Release, the ordered Delta releases, and
+    the final dbhash -- matches the loaded Hash Set provenance. A missing
+    manifest or any mismatch means the mount is unverified, so the service is
+    not-ready and serves nothing (ADR-0005). Per ADR-0006 the service trusts
+    the verified mount; it does not recompute dbhash.
+    """
+    if manifest is None or hash_set is None:
+        return False
+    record = {
+         "set": manifest.get("set"),
+         "release": manifest.get("release"),
+         "deltas": manifest.get("deltas"),
+         "dbhash": manifest.get("dbhash"),
+     }
+    return record == hash_set.provenance.dataset()
 
 
 def _sql_literal(value: Any) -> str:

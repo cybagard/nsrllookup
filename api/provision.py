@@ -85,9 +85,12 @@ def provision(base_path, set_name, release, deltas,
         applied.append(release_name)
     if not verify_dbhash(current.path, published_dbhash, dbhash):
         raise ValueError("dbhash mismatch: dataset integrity failed")
-    record = write_manifest(manifest_path, set_name, release,
-                            applied, dbhash(current.path))
-    return current, record
+    token = published_dbhash.lower()
+    verified = hasheset.provision(
+        current.path,
+        Provenance(set_name, release, applied, token))
+    record = write_manifest(manifest_path, set_name, release, applied, token)
+    return verified, record
 
 
 def _expected_line(sidecar: Path):

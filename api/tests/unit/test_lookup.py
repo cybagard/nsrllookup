@@ -53,7 +53,7 @@ def test_each_result_carries_full_provenance(hash_set):
     result = look_up(hash_set, [KNOWN_MD5], "md5")[0]
     assert result["algorithm"] == "md5"
     assert result["dataset"] == {"set": "modern", "release": "2026.03.1",
-                                 "deltas": ["2026.06.1"]}
+                                  "deltas": ["2026.06.1"], "dbhash": None}
 
 
 def test_digests_normalised_to_uppercase(hash_set):

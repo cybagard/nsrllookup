@@ -14,6 +14,7 @@ import hasheset
 
 KNOWN_MD5 = "AD7B9C14083B52BC532FBA5948342B98"
 UNKNOWN_MD5 = "2977520A5C5FAAD2286D58675E400412"
+DBHASH = "deadbeef"
 
 
 def _provision(tmp_path):
@@ -25,14 +26,15 @@ def _provision(tmp_path):
                 "package_id": 0},
          ])
     return hasheset.provision(path,
-            Provenance("modern", "2026.03.1", ["2026.06.1"]))
+            Provenance("modern", "2026.03.1", ["2026.06.1"], DBHASH))
 
 
 def test_session_produces_one_audit_entry(tmp_path):
     """A finished session writes exactly one Audit Entry."""
     log = str(tmp_path / "audit.log")
     trail = AuditTrail(log)
-    app.configure(_provision(tmp_path))
+    _hs = _provision(tmp_path)
+    app.configure(_hs, _hs.provenance.dataset())
     app.configure_audit(trail)
     try:
         response = app.api.test_client().post('/check',
@@ -48,7 +50,8 @@ def test_audit_entry_carries_required_fields(tmp_path):
     """One entry: timestamp, caller, algorithm, digests + status, dataset."""
     log = str(tmp_path / "audit.log")
     trail = AuditTrail(log)
-    app.configure(_provision(tmp_path))
+    _hs = _provision(tmp_path)
+    app.configure(_hs, _hs.provenance.dataset())
     app.configure_audit(trail)
     try:
         app.api.test_client().post('/check',
@@ -61,7 +64,7 @@ def test_audit_entry_carries_required_fields(tmp_path):
         assert statuses[KNOWN_MD5] == "known"
         assert statuses[UNKNOWN_MD5] == "unknown"
         assert entry["dataset"] == {"set": "modern", "release": "2026.03.1",
-               "deltas": ["2026.06.1"]}
+               "deltas": ["2026.06.1"], "dbhash": DBHASH}
     finally:
         app.configure(None)
         app.configure_audit(AuditTrail())
@@ -70,7 +73,8 @@ def test_audit_entry_carries_required_fields(tmp_path):
 def test_audit_trail_is_durable(tmp_path):
     """Appended entries survive on disk: the trail is durable & append-only."""
     log = str(tmp_path / "audit.log")
-    app.configure(_provision(tmp_path))
+    _hs = _provision(tmp_path)
+    app.configure(_hs, _hs.provenance.dataset())
     app.configure_audit(AuditTrail(log))
     try:
         client = app.api.test_client()
