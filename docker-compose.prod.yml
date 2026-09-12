@@ -9,10 +9,12 @@ services:
       context: ./api
       dockerfile: Dockerfile
     image: nsrllookup-api
-    # The provisioned, queryable Hash Set is mounted read-only; the Audit
-    # Trail is mounted read-write so it is durable and append-only.
+    # The provisioned data dir carries the queryable rds.db and the
+    # Provisioning manifest; mounting it read-only makes both visible to
+    # boot, which reports ready iff the manifest agrees with the db. The
+    # Audit Trail is mounted read-write so it is durable and append-only.
     volumes:
-       - ./data/rds.db:/data/rds.db:ro
+       - ./data:/data:ro
        - ./data/audit:/var/log/nsrllookup
     command: python /api/app.py
     ports:

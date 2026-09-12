@@ -1,13 +1,36 @@
-# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–07 DONE (7/9), next is 08 ∥ 09
+# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–08 DONE (8/9), next is 09
 
 two things to know: the **RDS V3 migration is complete and committed**, but it was
 built against a **synthetic** on-disk schema. The follow-up effort **`rds-v3-live`**
 re-bases the data layer onto NIST's **real** RDS V3 layout and makes the service
-deployable. As of this handoff, **tickets `01`–`07` are done and committed**
-(`01`–`05` earlier; `06` + `07` at `2a7d031`). `08 ∥ 09` remain. The suite is
-green (58 / 99%) and 7 of the spine's tickets are in — not a dead end. The live
+deployable. As of this handoff, **tickets `01`–`08` are done and committed**
+(`01`–`05` earlier; `06` + `07` at `2a7d031`; `08` this session). Only `09`
+(.housekeeping) remains. The suite is green (**60 / 98%** — `+2` from the new
+fixture deploy smoke) and 8 of the spine's tickets are in. The live
 spec now exists at `.scratch/rds-v3-live/spec.md` and `docs/adr/0005..0006` are
 written.
+
+## 5a. What `08` added (fixture deploy smoke + boot seam)
+
+- **`api/boot.py` (new):** the one place a provisioned, verified volume becomes a
+   ready app. `bootstrap()` reads the **Provisioning manifest** + `rds.db` from the
+   mounted data dir, rebuilds the Sidecar index via `hasheset.provision`, and
+   `app.configure`s the loaded **Hash Set** + manifest (ADR-0005/0006). A missing
+   db/manifest ⇒ not-ready. `app.py` `__main__` now does `bootstrap()` then
+   `serve(_app.api, …)` — it **serves the `app` *module's* `api`, not `__main__`'s**,
+   or the served server never sees the Hash Set (the smoke caught this bug).
+- **`tests/integration/test_deploy_smoke.py` (new, 2 tests):** the demoable slice
+   — fixture Hash Set + manifest written as the Provisioner would, then booted
+   through `bootstrap` and driven through Flask's test client: `/health` `ready`
+   with `dbhash`-bearing `dataset` + `/check` `known`; an empty-volume control ⇒
+   `not-ready` + `/check` 503. No live server, no real-data download.
+- **Compose:** `docker-compose.{prod,build}.yml` now mount the whole data dir
+   (`./data:/data:ro`) instead of the single `rds.db` file, so the manifest next
+   to the db is visible to `boot`; both validate under `docker compose config`.
+- **Demonstration (out of CI):** the dev image booted against a fixture volume and
+   answered over HTTP — `/health` `ready` + `dbhash`, `/check` `known`/`unknown`
+   with `dbhash`, no-volume control `not-ready`, Audit Trail recorded both sessions.
+   The full ~18 GiB Minimal + production deploy stay operator steps.
 
 ## 1. Migration status (unchanged, still true)
 
@@ -48,8 +71,9 @@ shipped `schema.sql`, release `2026.09.1`; evidence + 3 integrity layers in
 
 Spec: `.scratch/rds-v3-live/spec.md` (written). ADRs `0005`/`0006` written + committed.
 **9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05` **RESOLVED +
-committed** (the Provisioner, `api/provision.py` + its tests + `pylintrc`); `06` + `07`
-**RESOLVED + committed at `2a7d031`**; `08 ∥ 09` `ready-for-agent`.
+ committed** (the Provisioner, `api/provision.py` + its tests + `pylintrc`); `06` + `07`
+ **RESOLVED + committed at `2a7d031`**; `08` **RESOLVED** (boot seam + fixture deploy
+ smoke, this session — pending its own commit); `09` `ready-for-agent`.
 
 **Ticket spine (`.scratch/rds-v3-live/issues/`, 9):**
 `01` **DONE** `3ba267c` byte-confirm real `FILE`/`DISTINCT_HASH` schema from NIST
@@ -188,10 +212,9 @@ Seam-1/Seam-2 tests updated for the `dbhash` field + matching manifest.
 - Suite (in-container, == CI `test` job): **58 passed, 0 skipped, 99% coverage**,
    exit 0. (The `--cov` "no data" report warning under the container mount is a config
    artifact, not a test failure.)
-- **All work is committed** (`01`–`07`); nothing is pending. The standing instruction is
-   still to **pause after each bullet for confirmation before committing**.
-- **Next: `08 ∥ 09`** (both fork off the now-done `06`): `08` **fixture deploy smoke**
-   (build → run → `/health` `ready` + `/check` `known` with `dbhash`, no real-data
-   download); `09` **housekeeping** (retire superseded `rds-v3-migration` ticket 15;
-    drop the dormant `live` marker; refresh `README.md` for the real layout + readiness
-    gate + fixture deploy). They are independent and may land in either order.
+- **All work is committed** (`01`–`07`); `08` is done but **pending its own commit**
+   (the standing instruction is to **pause after each bullet for confirmation before
+   committing**).
+- **Next: `09`** (housekeeping, forked off the now-done `06`): retire superseded
+   `rds-v3-migration` ticket 15; drop the dormant `live` marker; refresh `README.md`
+   for the real layout + readiness gate + the `08` fixture deploy.

@@ -7,9 +7,12 @@ services:
       context: ./api
       dockerfile: Dockerfile
     image: nsrllookup-api
+    # Mount the provisioned data dir read-only so both rds.db and its
+    # Provisioning manifest are visible to boot; the Audit Trail stays
+    # read-write and append-only.
     volumes:
-        - ./data/rds.db:/data/rds.db:ro
-        - ./data/audit:/var/log/nsrllookup
+      - ./data:/data:ro
+      - ./data/audit:/var/log/nsrllookup
     command: python /api/app.py
     ports:
-        - 5000:5000
+      - 5000:5000

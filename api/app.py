@@ -126,6 +126,9 @@ def health():
 
 
 if __name__ == '__main__':
-    serve(api,
+    import app as _app
+    import boot
+    boot.bootstrap()
+    serve(_app.api,
         host='0.0.0.0',
         port=5000)
