@@ -72,8 +72,9 @@ shipped `schema.sql`, release `2026.09.1`; evidence + 3 integrity layers in
 Spec: `.scratch/rds-v3-live/spec.md` (written). ADRs `0005`/`0006` written + committed.
 **9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05` **RESOLVED +
  committed** (the Provisioner, `api/provision.py` + its tests + `pylintrc`); `06` + `07`
- **RESOLVED + committed at `2a7d031`**; `08` **RESOLVED** (boot seam + fixture deploy
- smoke, this session — pending its own commit); `09` `ready-for-agent`.
+ **RESOLVED + committed at `42447fa`**; `08` **RESOLVED +
+ committed** (boot seam `api/boot.py` + fixture deploy smoke + compose data-dir
+ mount, this session); `09` `ready-for-agent`.
 
 **Ticket spine (`.scratch/rds-v3-live/issues/`, 9):**
 `01` **DONE** `3ba267c` byte-confirm real `FILE`/`DISTINCT_HASH` schema from NIST
@@ -212,9 +213,10 @@ Seam-1/Seam-2 tests updated for the `dbhash` field + matching manifest.
 - Suite (in-container, == CI `test` job): **58 passed, 0 skipped, 99% coverage**,
    exit 0. (The `--cov` "no data" report warning under the container mount is a config
    artifact, not a test failure.)
-- **All work is committed** (`01`–`07`); `08` is done but **pending its own commit**
-   (the standing instruction is to **pause after each bullet for confirmation before
-   committing**).
+- **All work is committed** (`01`–`08`, the last at `42447fa`). The standing
+    instruction is to **pause after each bullet for confirmation before
+   committing** — that held; the handoff's `08`/commit-sha bookkeeping lands in
+   the next bullet's commit.
 - **Next: `09`** (housekeeping, forked off the now-done `06`): retire superseded
    `rds-v3-migration` ticket 15; drop the dormant `live` marker; refresh `README.md`
    for the real layout + readiness gate + the `08` fixture deploy.
