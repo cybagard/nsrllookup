@@ -17,7 +17,7 @@ this ticket.
 **Blocked by:** 06 (manifest/readiness + `dbhash` surfacing) — the mechanics smoke exercises
 the reader + delta + readiness + `dbhash` path end to end.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] (a) The Minimal `FILE`/`DISTINCT_HASH` schema is byte-confirmed against NIST's shipped
           `schema.sql` and recorded.

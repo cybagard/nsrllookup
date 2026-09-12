@@ -1,13 +1,13 @@
-# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–05 DONE (5/9), next is 06
+# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–07 DONE (7/9), next is 08 ∥ 09
 
 two things to know: the **RDS V3 migration is complete and committed**, but it was
 built against a **synthetic** on-disk schema. The follow-up effort **`rds-v3-live`**
 re-bases the data layer onto NIST's **real** RDS V3 layout and makes the service
-deployable. As of this handoff, **tickets `01`–`05` are done**; `05` (the
-Provisioner) is landed in the **working tree, NOT yet committed**. `06`–`09`
-remain. The suite is green (54 / 98%) and 5 of the spine's tickets are in — not a
-dead end. The live spec now exists at `.scratch/rds-v3-live/spec.md` and
-`docs/adr/0005..0006` are written.
+deployable. As of this handoff, **tickets `01`–`07` are done and committed**
+(`01`–`05` earlier; `06` + `07` at `2a7d031`). `08 ∥ 09` remain. The suite is
+green (58 / 99%) and 7 of the spine's tickets are in — not a dead end. The live
+spec now exists at `.scratch/rds-v3-live/spec.md` and `docs/adr/0005..0006` are
+written.
 
 ## 1. Migration status (unchanged, still true)
 
@@ -47,28 +47,33 @@ shipped `schema.sql`, release `2026.09.1`; evidence + 3 integrity layers in
 ## 3. `rds-v3-live` — DESIGN + PROGRESS
 
 Spec: `.scratch/rds-v3-live/spec.md` (written). ADRs `0005`/`0006` written + committed.
-**9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05`
-**RESOLVED, in the working tree (uncommitted)**; `06`–`09` `ready-for-agent`.
+**9 tickets**: `01`, `02`, `03`, `04` **RESOLVED + committed**; `05` **RESOLVED +
+committed** (the Provisioner, `api/provision.py` + its tests + `pylintrc`); `06` + `07`
+**RESOLVED + committed at `2a7d031`**; `08 ∥ 09` `ready-for-agent`.
 
 **Ticket spine (`.scratch/rds-v3-live/issues/`, 9):**
 `01` **DONE** `3ba267c` byte-confirm real `FILE`/`DISTINCT_HASH` schema from NIST
 `schema.sql` (evidence in `…/artifacts/`) → `02` **DONE** `9509ad0` domain
 model + ADR-0005/0006 (`CONTEXT.md` + `docs/adr/0005..0006`) → `03` **DONE** `36c0350`
 re-base data layer to `FILE`/`DISTINCT_HASH` + UPPERCASE/case-agnostic Sidecar index
-(one red→green batch; `hasheset.py` + every fixture, `40 passed / 98% coverage`) →
-`04` **DONE** `131598e` apply a Delta as NIST's ordered `.sql` (copy-on-apply +
-`sqlite3.executescript`, no CLI), rebuild Sidecar, refresh provenance, + no-cross-set
-guard; `build_delta_sql` is the fixture seam; `hasheset.py` modernised to PEP-8 +
-f-strings and is now lint-clean (`42 passed / 98%`) → `05` **DONE (UNCOMMITTED)**
-Provisioner + 3-layer integrity in new `api/provision.py` → `06` provisioning
-manifest + readiness gate + per-result `dbhash` → fork: `07` real-data mechanics
-smoke (one-off on `RDS_2021.12.2_curated`, out of CI, ∥) `08` fixture deploy smoke
-(build → run → `/health`+`/check` green, ∥) `09` housekeeping (retire `ticket 15`,
-refresh README, `live`-marker already pruned at `d01b933`).
-**Next frontier: `06`** (manifest readiness gate + per-result `dbhash`). `07 ∥ 08 ∥ 09`
-fork off `06`.
+(one red→green batch; `hasheset.py` + every fixture) → `04` **DONE** `131598e` apply a
+Delta as NIST's ordered `.sql` (copy-on-apply + `sqlite3.executescript`, no CLI),
+rebuild Sidecar, refresh provenance, + no-cross-set guard; `build_delta_sql` is the
+fixture seam → `05` **DONE** Provisioner + 3-layer integrity in `api/provision.py` (zip
+SHA-1, inner SHA-256 signatures, `dbhash` injected per ADR-0006; ordered apply; manifest
+write) → `06` **DONE** `2a7d031` provisioning manifest readiness gate (ADR-0005) +
+per-result `dbhash`; `07 ∥ 08 ∥ 09` fork off `06`.
 
-**What landed in `05` (Provisioner, `api/provision.py` — UNCOMMITTED):**
+**What landed in `06` (`2a7d031`, half of it):** the manifest is the readiness gate.
+`app.configure(hash_set, manifest)`; `/check` + `/health` report `ready` **iff**
+`hasheset.verify_readiness(manifest, hash_set)` holds (manifest present **and** its
+`set`/`release`/ordered-`deltas`/final-`dbhash` equal the loaded set's provenance); a
+missing or mismatched manifest ⇒ 503 / `not-ready`. `Provenance.dataset()` gains `dbhash`;
+`apply_delta` carries it forward; `Provision` finalises the returned set with the verified
+token and writes it into the manifest. New `tests/integration/test_readiness.py`; existing
+Seam-1/Seam-2 tests updated for the `dbhash` field + matching manifest.
+
+**What landed in `05` (Provisioner, `api/provision.py` — now committed at `2a7d031`):**
 - New Seam-3 module, **no new dependency** (stdlib `hashlib`/`json`/`re`). Three
   integrity verifiers + the ordered apply + the manifest write.
   - **Layer 1** `verify_zip_sha(zip, sidecar)`: zip SHA-1 == NIST `.sha`
@@ -155,12 +160,16 @@ fork off `06`.
    (delta-only; last full `2026.03.1`). **The schema/delta are inside the zip**, not
    top-level objects.
 - **Capture, don't re-download:** ticket `01`'s evidence is staged in
-   `.scratch/rds-v3-live/artifacts/` — `extracted/` holds the 7 small text files
-     (committed; `schema.sql`, `signatures.txt`, `delta.readme.txt`, `version.txt`,
-     `dbhashes.txt`, `hash_counts.txt`, `README.txt`); `raw/` holds the 185 MiB zip +
-      `.zip_sha` (**gitignored** via `artifacts/.gitignore` — kept on disk for tickets
-      `05`/`07`, not committed). SHA-1 + SHA-256 of the zip verified against the
-      sidecar + `signatures.txt`.
+   `.scratch/rds-v3-live/artifacts/` — `extracted/` holds the small text files
+    (committed; `schema.sql`, `signatures.txt`, `delta.readme.txt`, `version.txt`,
+    `dbhashes.txt`, `hash_counts.txt`, `README.txt`); `raw/` holds the heavy zips +
+    their `.sha`/`.zip_sha` sidecars (**gitignored** via `artifacts/.gitignore` — kept
+     on disk, not committed). For `07` that now also includes
+     `RDS_2021.12.2_curated.zip` (87 MiB, downloaded 2026-09-12 from
+     `…/RDS/rds_2021.12.2/RDS_2021.12.2_curated.zip` — the per-release path; the flat
+     `…/RDS/RDS_2021.12.2_curated.zip` 403s) + `…_curated.zip.sha`. The one-off smoke
+     script `.scratch/rds-v3-live/artifacts/realdata_smoke.py` is committed; the zips +
+     the extracted db are not.
 - **`dbhash` binary is NOT installed locally** (`which dbhash` → not found). Ticket
    `05` (integrity layer 3) needs NIST's `dbhash` external binary or a verified
    stand-in — see ADR-0006.
@@ -176,21 +185,13 @@ fork off `06`.
 
 ## 5. Current health + suggested next step
 
-- Suite (in-container, == CI `test` job): **54 passed, 0 skipped, 98% coverage**,
-   exit 0.
-- Lint: **`provision.py` is 10.00/10, 0 findings** (clean PEP-8 4-space);
-    `test_provision.py` ≈ 9.82/10 (two long module-docstring lines only).
-     `hasheset.py` still 0 findings. Pre-existing untouched: `app.py` C0303/W1405
-     and the `E0015`/`UserWarning` `pylintrc` quirk.
-- **`05` is in the working tree, NOT committed** (`api/provision.py`,
-    `api/tests/test_provision.py`, the `pylintrc` one-liner, and the
-     `.scratch/rds-v3-live/issues/05-*.md` `resolved` state). The standing
-     instruction is to **pause after each bullet for confirmation before
-      committing** — commit is pending.
-- **Next: ticket `06`** — the **readiness gate + per-result `dbhash`**: extend
-    `Provenance.dataset()` (and `/health`) to carry the final `dbhash` from the
-     manifest, and make the service **ready only when the Provisioning manifest is
-     present and its integrity matches the mounted db** (ADR-0005), refusing serve
-     on mismatch. The manifest record already exists (`05`); `06` consumes it at
-     boot. `07 ∥ 08 ∥ 09` fork off `06`. Commit `05` first (one tracer bullet),
-     then `06`.
+- Suite (in-container, == CI `test` job): **58 passed, 0 skipped, 99% coverage**,
+   exit 0. (The `--cov` "no data" report warning under the container mount is a config
+   artifact, not a test failure.)
+- **All work is committed** (`01`–`07`); nothing is pending. The standing instruction is
+   still to **pause after each bullet for confirmation before committing**.
+- **Next: `08 ∥ 09`** (both fork off the now-done `06`): `08` **fixture deploy smoke**
+   (build → run → `/health` `ready` + `/check` `known` with `dbhash`, no real-data
+   download); `09` **housekeeping** (retire superseded `rds-v3-migration` ticket 15;
+    drop the dormant `live` marker; refresh `README.md` for the real layout + readiness
+    gate + fixture deploy). They are independent and may land in either order.
