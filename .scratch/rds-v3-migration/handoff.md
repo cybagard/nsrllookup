@@ -1,14 +1,12 @@
-# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort, tickets 01–08 DONE (8/9), next is 09
+# Handoff: nsrllookup — migration COMPLETE; `rds-v3-live` rebase effort COMPLETE (9/9)
 
-two things to know: the **RDS V3 migration is complete and committed**, but it was
-built against a **synthetic** on-disk schema. The follow-up effort **`rds-v3-live`**
-re-bases the data layer onto NIST's **real** RDS V3 layout and makes the service
-deployable. As of this handoff, **tickets `01`–`08` are done and committed**
-(`01`–`05` earlier; `06` + `07` at `2a7d031`; `08` this session). Only `09`
-(.housekeeping) remains. The suite is green (**60 / 98%** — `+2` from the new
-fixture deploy smoke) and 8 of the spine's tickets are in. The live
-spec now exists at `.scratch/rds-v3-live/spec.md` and `docs/adr/0005..0006` are
-written.
+two things to know: the **RDS V3 migration is complete and committed**, and the
+follow-up effort **`rds-v3-live`** — which re-bases the data layer onto NIST's
+**real** RDS V3 layout and makes the service deployable — is **now complete**: all
+**9 tickets are done and committed** (`01`–`08` earlier; `09` housekeeping this
+commit). The suite is green (**60 passed / 0 skipped**) after the prune. The
+live spec now exists at `.scratch/rds-v3-live/spec.md` and `docs/adr/0005..0006`
+are written.
 
 ## 5a. What `08` added (fixture deploy smoke + boot seam)
 
@@ -30,7 +28,26 @@ written.
 - **Demonstration (out of CI):** the dev image booted against a fixture volume and
    answered over HTTP — `/health` `ready` + `dbhash`, `/check` `known`/`unknown`
    with `dbhash`, no-volume control `not-ready`, Audit Trail recorded both sessions.
-   The full ~18 GiB Minimal + production deploy stay operator steps.
+    The full ~18 GiB Minimal + production deploy stay operator steps.
+
+## 5b. What `09` did (housekeeping — non-code cleanup)
+
+- **Retire `rds-v3-migration` ticket 15:** its banner already read `superseded by
+    rds-v3-live`; this pass reconciled its pointers to the current spine (`issues/
+    01..09`; goal now tickets `05–08`, the **Provisioner** + readiness gate + boot/
+    deploy smoke). Left as history only.
+- **Drop the dormant `live` marker:** the `--live` opt-in + `NSRLLOOKUP_LIVE` gate +
+    the pytest `live` marker were already pruned in `d01b933` (no test consumes them);
+    this pass removed the one stray reference left — the stale `# Live-server tests
+    are gated…` comment in `.github/workflows/test.yml` — so nothing in code/config
+    mentions the marker and no test depends on it.
+- **Refresh `README.md`:** re-pointed at the real `FILE`/`DISTINCT_HASH` **Set
+    schema**, the **Provisioner** / three-layer integrity, the **Provisioning
+    manifest** **readiness gate**, the **dbhash**-bearing `dataset` block, and the
+    fixture **deploy smoke** (`test_deploy_smoke.py`); ADR range widened to
+    `0001..0006`, spec pointer to `rds-v3-live/spec.md`.
+- **Suite stays green** (**60 passed / 0 skipped**) after the prune — the marker was
+    unused, so the change is a pure no-op on behaviour.
 
 ## 1. Migration status (unchanged, still true)
 
@@ -74,7 +91,9 @@ Spec: `.scratch/rds-v3-live/spec.md` (written). ADRs `0005`/`0006` written + com
  committed** (the Provisioner, `api/provision.py` + its tests + `pylintrc`); `06` + `07`
  **RESOLVED + committed at `42447fa`**; `08` **RESOLVED +
  committed** (boot seam `api/boot.py` + fixture deploy smoke + compose data-dir
- mount, this session); `09` `ready-for-agent`.
+ mount, this session); `09` **RESOLVED + committed this commit** (housekeeping:
+ retired ticket 15, dropped the last stray `live`-marker comment in
+ `test.yml`, refreshed `README.md`; the marker itself was pruned in `d01b933`).
 
 **Ticket spine (`.scratch/rds-v3-live/issues/`, 9):**
 `01` **DONE** `3ba267c` byte-confirm real `FILE`/`DISTINCT_HASH` schema from NIST
@@ -87,7 +106,9 @@ rebuild Sidecar, refresh provenance, + no-cross-set guard; `build_delta_sql` is 
 fixture seam → `05` **DONE** Provisioner + 3-layer integrity in `api/provision.py` (zip
 SHA-1, inner SHA-256 signatures, `dbhash` injected per ADR-0006; ordered apply; manifest
 write) → `06` **DONE** `2a7d031` provisioning manifest readiness gate (ADR-0005) +
-per-result `dbhash`; `07 ∥ 08 ∥ 09` fork off `06`.
+per-result `dbhash`; `07 ∥ 08 ∥ 09` fork off `06` — all three now **DONE**
+(`08` boot seam + deploy smoke; `09` housekeeping: retired ticket 15, dropped the
+last stray `live`-marker comment, refreshed `README.md`).
 
 **What landed in `06` (`2a7d031`, half of it):** the manifest is the readiness gate.
 `app.configure(hash_set, manifest)`; `/check` + `/health` report `ready` **iff**
@@ -210,13 +231,11 @@ Seam-1/Seam-2 tests updated for the `dbhash` field + matching manifest.
 
 ## 5. Current health + suggested next step
 
-- Suite (in-container, == CI `test` job): **58 passed, 0 skipped, 99% coverage**,
-   exit 0. (The `--cov` "no data" report warning under the container mount is a config
-   artifact, not a test failure.)
-- **All work is committed** (`01`–`08`, the last at `42447fa`). The standing
-    instruction is to **pause after each bullet for confirmation before
-   committing** — that held; the handoff's `08`/commit-sha bookkeeping lands in
-   the next bullet's commit.
-- **Next: `09`** (housekeeping, forked off the now-done `06`): retire superseded
-   `rds-v3-migration` ticket 15; drop the dormant `live` marker; refresh `README.md`
-   for the real layout + readiness gate + the `08` fixture deploy.
+- Suite (in-container, == CI `test` job): **60 passed, 0 skipped**, exit 0. (The
+    `--cov` "no data" report warning under the container mount is a config artifact,
+    not a test failure.)
+- **All work is committed** (`01`–`09`, the last this commit: housekeeping — ticked
+    `09` done, retired `rds-v3-migration` ticket 15, refreshed `README.md` + `test.yml`).
+    The standing instruction is to **pause after each bullet for confirmation before
+    committing** — the `rds-v3-live` effort is now **complete (9/9)**; no further
+    tickets remain on this spine.

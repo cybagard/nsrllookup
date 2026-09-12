@@ -17,10 +17,11 @@ release + its metadata to it.
 > **Superseded.** This ticket was the production-provisioning ticket opened by the
 > "make it live/deployable" pass, before the real NIST schema was confirmed. It is
 > **carried forward and replaced** by the `rds-v3-live` effort
-> (`.scratch/rds-v3-live/spec.md` + `issues/01..07`), which re-bases the data layer onto
+> (`.scratch/rds-v3-live/spec.md` + `issues/01..09`), which re-bases the data layer onto
 > NIST's **real** `FILE`/`DISTINCT_HASH` layout, adopts `.sql` delta application, and adds
 > the three-layer integrity check + provisioning manifest. This `ticket 15`'s "provision a
-> production set" goal is now `rds-v3-live` tickets 04–07. Left here as history only.
+> production set" goal is now `rds-v3-live` tickets 05–08 (the **Provisioner** + readiness
+> gate + boot/deploy smoke). Left here as history only.
 
 - [ ] Provisioning fetches + extracts the **Minimal** V3 **Release** for a named **Set**
       (Modern, ~18 GB — not the ~124 GB full set, per ADR-0003) to the mounted db path
