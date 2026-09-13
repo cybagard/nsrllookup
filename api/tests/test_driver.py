@@ -1,0 +1,247 @@
+"""Turnkey driver smoke checks (Seam 3, I/O-bound, out-of-CI).
+
+The driver ties the Provisioner together end to end: fetch (ticket 02),
+verify three layers, apply the ordered Deltas, record NIST's published
+``dbhash`` (ticket 01), and write the queryable Hash Set + Sidecar index +
+Provisioning manifest. The checks here exercise that orchestration on a
+tiny fixture with the fetch *stubbed* (a stand-in ``opener`` returns bytes
+for known NIST objects), so the wiring is assertable without the multi-GB
+download, which stays the operator's step (ADR-0003).
+"""
+
+import hashlib
+import io
+import urllib.error
+import zipfile
+
+import hasheset
+from hasheset import build_delta_sql
+from hasheset import build_minimal_fixture_db
+from hasheset import verify_readiness
+
+from driver import apply_delta_releases
+from driver import IntegrityError
+from driver import provision_release
+from driver import verify_release
+from provision import read_manifest
+
+_RELEASE = "2026.09.1"
+_DELTA_1 = "2026.06.1"
+_DELTA_2 = "2026.03.1"
+_DBHASH = "481e5f55f6d1ed63ea0f176779efc5cc5d53e52a"
+_BASE = "https://s3.amazonaws.com/rds.nsrl.nist.gov/RDS"
+
+
+def _row(md5, name):
+    return {"crc32": None, "md5": md5, "sha1": None, "sha256": None,
+             "file_name": name, "file_size": 0, "package_id": 0}
+
+
+def _inner_signatures(entries):
+    lines = ["SHA256(" + n + ")= " + h for n, h in entries]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def _sha1_sidecar(name, digest):
+    return ("SHA1(" + name + ")= " + digest + "\n").encode("utf-8")
+
+
+def _zip_bytes(files):
+    # Build an NIST-style archive in memory: a tree of inner files.
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+def _build_release_zip(tmp_path):
+    # A full-Minimal Release archive: base .db + inner signatures + readme.
+    db_path = tmp_path / "base_db.db"
+    build_minimal_fixture_db(
+        str(db_path),
+         [_row("11111111111111111111111111111111", "base.bin")])
+    db_bytes = db_path.read_bytes()
+    readme = b"modern minimal release readme"
+    sigs = _inner_signatures([
+          ("rds.db", hashlib.sha256(db_bytes).hexdigest()),
+          ("readme.txt", hashlib.sha256(readme).hexdigest())])
+    top = "RDS_" + _RELEASE + "_modern_minimal"
+    files = {
+          top + "/": b"",
+          top + "/rds.db": db_bytes,
+          top + "/readme.txt": readme,
+          top + "/signatures.txt": sigs,
+       }
+    return _zip_bytes(files)
+
+
+def _build_delta_zip(tmp_path, delta_release, row):
+    # A delta release archive: the ordered .sql + inner signatures + readme.
+    sql_text = build_delta_sql([row])
+    sql_bytes = sql_text.encode("utf-8")
+    readme = b"delta readme"
+    top = "RDS_" + delta_release + "_modern_minimal_delta"
+    sql_file = "RDS_" + delta_release + "_modern_minimal_delta.sql"
+    sigs = _inner_signatures([
+           (sql_file, hashlib.sha256(sql_bytes).hexdigest()),
+           ("readme.txt", hashlib.sha256(readme).hexdigest())])
+    files = {
+          top + "/": b"",
+          top + "/" + sql_file: sql_bytes,
+          top + "/readme.txt": readme,
+          top + "/signatures.txt": sigs,
+       }
+    return _zip_bytes(files)
+
+
+class _Handle:
+    # A stand-in for urllib's opened object: a context manager with .read().
+    def __init__(self, content):
+        self._content = content
+
+    def read(self):
+        return self._content
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _fake_opener(store):
+    # A stub network: return bytes for a known object, refuse a miss.
+    def opener(url):
+        if url not in store:
+            raise urllib.error.URLError("no such object: " + url)
+        return _Handle(store[url])
+    return opener
+
+
+def _store(tmp_path):
+    # The NIST objects a real fetch would return, built in memory.
+    release_zip = _build_release_zip(tmp_path)
+    row_d1 = _row("AAAA4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A", "delta1.bin")
+    row_d2 = _row("BBBB4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B", "delta2.bin")
+    delta1_zip = _build_delta_zip(tmp_path, _DELTA_1, row_d1)
+    delta2_zip = _build_delta_zip(tmp_path, _DELTA_2, row_d2)
+    rzip = "RDS_" + _RELEASE + "_modern_minimal.zip"
+    d1 = "RDS_" + _DELTA_1 + "_modern_minimal_delta.zip"
+    d2 = "RDS_" + _DELTA_2 + "_modern_minimal_delta.zip"
+    store = {
+           _BASE + "/rds_" + _RELEASE + "/" + rzip: release_zip,
+           _BASE + "/rds_" + _RELEASE + "/" + rzip + ".sha":
+                _sha1_sidecar(rzip, hashlib.sha1(release_zip).hexdigest()),
+           _BASE + "/rds_" + _DELTA_1 + "/" + d1: delta1_zip,
+           _BASE + "/rds_" + _DELTA_1 + "/" + d1 + ".sha":
+                _sha1_sidecar(d1, hashlib.sha1(delta1_zip).hexdigest()),
+           _BASE + "/rds_" + _DELTA_2 + "/" + d2: delta2_zip,
+           _BASE + "/rds_" + _DELTA_2 + "/" + d2 + ".sha":
+                _sha1_sidecar(d2, hashlib.sha1(delta2_zip).hexdigest()),
+           _BASE + "/rds_" + _RELEASE + "/dbhashes.txt":
+                 (_DBHASH + " RDS_" + _RELEASE + "_modern_minimal.db\n").encode(),
+           _BASE + "/rds_" + _RELEASE + "/signatures.txt": b"",
+        }
+    return store, row_d1, row_d2
+
+
+def _provision(tmp_path, deltas, *, store):
+    return provision_release(
+          _RELEASE, deltas,
+         data_dir=str(tmp_path / "data"),
+         work_dir=str(tmp_path / "work"),
+         opener=_fake_opener(store))
+
+
+def test_provision_applies_deltas_in_order(tmp_path):
+    # The turnkey flow applies the ordered Deltas onto the Release.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    hash_set, record = _provision(tmp_path, [_DELTA_1], store=store)
+    assert record["deltas"] == [_DELTA_1]
+    assert record["dbhash"] == _DBHASH
+    assert record["set"] == "modern"
+    assert record["release"] == _RELEASE
+    assert hash_set.is_known("md5", "AAAA4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A")
+    assert hash_set.is_known("md5", "11111111111111111111111111111111")
+
+
+def test_manifest_round_trips_through_read_manifest(tmp_path):
+    # The written Provisioning manifest round-trips via read_manifest.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    hash_set, record = _provision(
+            tmp_path, [_DELTA_1, _DELTA_2], store=store)
+    manifest_path = tmp_path / "data" / "manifest.json"
+    assert read_manifest(manifest_path) == record
+    assert verify_readiness(read_manifest(manifest_path), hash_set) is True
+
+
+def test_verify_reports_ready_volume(tmp_path):
+    # make verify re-checks the provisioned volume and reports ready.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    _provision(tmp_path, [_DELTA_1], store=store)
+    result = verify_release(str(tmp_path / "data"))
+    assert result.ready is True
+    assert result.checks["manifest"] == "present"
+    assert result.checks["well_formed"] is True
+    assert result.checks["ready"] is True
+
+
+def test_verify_refuses_missing_manifest(tmp_path):
+    # make verify on an unprovisioned volume is not-ready.
+    data = tmp_path / "data"
+    data.mkdir()
+    result = verify_release(str(data))
+    assert result.ready is False
+    assert result.checks["manifest"] == "absent"
+
+
+def test_verify_refuses_missing_hash_set(tmp_path):
+    # A manifest whose mounted Hash Set is gone is a stale, not-ready volume.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    _provision(tmp_path, [_DELTA_1], store=store)
+    (tmp_path / "data" / "rds.db").unlink()
+    result = verify_release(str(tmp_path / "data"))
+    assert result.ready is False
+    assert result.checks["hash_set"] == "absent"
+
+
+def test_tampered_layer_refuses_manifest_write(tmp_path):
+    # A zip whose SHA-1 sidecar fails (layer 1) refuses the manifest write.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    rzip = "RDS_" + _RELEASE + "_modern_minimal.zip"
+    store[_BASE + "/rds_" + _RELEASE + "/" + rzip + ".sha"] = (
+             _sha1_sidecar(rzip, "0" * 40))
+    try:
+         _provision(tmp_path, [_DELTA_1], store=store)
+    except IntegrityError:
+        pass
+    else:
+        raise AssertionError("expected a tampered layer to be refused")
+    assert not (tmp_path / "data" / "manifest.json").exists()
+
+
+def test_missing_published_token_refuses(tmp_path):
+    # A dbhashes.txt missing the Release's token refuses the manifest write.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    store[_BASE + "/rds_" + _RELEASE + "/dbhashes.txt"] = (
+            b"052bcc RDS_2026.09.1_legacy.db\n")
+    try:
+         _provision(tmp_path, [], store=store)
+    except IntegrityError:
+        pass
+    else:
+        raise AssertionError("expected a missing token to be refused")
+    assert not (tmp_path / "data" / "manifest.json").exists()
+
+
+def test_reapply_is_a_noop_for_ordered_list(tmp_path):
+    # A delta already recorded is a no-op for the ordered list on re-apply.
+    store, row_d1, _row_d2 = _store(tmp_path)
+    _hash_set, _record = _provision(tmp_path, [_DELTA_1], store=store)
+    set_obj = hasheset.provision(
+            str(tmp_path / "data" / "rds.db"),
+             hasheset.Provenance("modern", _RELEASE, [_DELTA_1], _DBHASH))
+    sql_text = build_delta_sql([row_d1])
+    redone = apply_delta_releases(set_obj, [(_DELTA_1, sql_text)])
+    assert list(redone.provenance.deltas) == [_DELTA_1]
