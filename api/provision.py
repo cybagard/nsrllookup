@@ -1,10 +1,13 @@
 """The Provisioner: a one-time, out-of-band flow that produces a queryable
 Hash Set (Seam 3, I/O-bound; never a build or CI step).
 
-It verifies a released archive in three layers -- the zip's SHA-1 against its
+The turnkey driver first fetches the full Minimal Release and its ordered
+Delta releases from NIST's per-Release S3 path (each object probed by exact
+name, since the listing is access-denied but the objects are public-read),
+then verifies a released archive in three layers -- the zip's SHA-1 against its
 sidecar, the inner files' SHA-256 against signatures.txt, and NIST's dbhash
-over the final post-delta database against dbhashes.txt -- then applies the
-ordered Deltas and writes the Hash Set's Sidecar index and Provisioning
+over the final post-delta database against dbhashes.txt -- and applies the
+ordered Deltas, writing the Hash Set's Sidecar index and Provisioning
 manifest. The dbhash layer is an external token function (ADR-0006): NIST's
 binary is accepted rather than re-implemented, and is injected so it is
 assertable without the binary present.
@@ -15,7 +18,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
+from typing import List
 
 import hasheset
 from hasheset import Provenance
@@ -25,6 +33,9 @@ _SIDECAR = re.compile(
 
 _SIGNATURE = re.compile(
         r"^SHA256\((?P<name>[^)]+)\)\s*=\s*(?P<digest>[0-9a-fA-F]+)\s*$")
+
+_DBHASH = re.compile(
+        r"^[ \t]*(?P<digest>[0-9a-fA-F]+) +(?P<name>\S+\.db)$")
 
 
 def verify_zip_sha(zip_path: Path, sidecar: Path) -> bool:
@@ -51,8 +62,175 @@ def verify_signatures(signed_dir: Path, signatures: Path) -> bool:
 
 
 def verify_dbhash(db_path, published, dbhash):
-    # Layer 3: the dataset token equals the published dbhashes.txt value.
+    # Layer 3 (compute-and-compare, fixture suite only): the computed token
+    # equals NIST's published value. Retained beside the record-and-attest
+    # path so the fixture suite keeps exercising the match/refuse mechanic.
     return dbhash(db_path) == published.lower()
+
+
+def read_published_dbhash(dbhashes, db_name):
+    # Layer 3 (record-and-attest, turnkey path): read NIST's published
+    # `dbhash` for the Release's database object from `dbhashes.txt`. The
+    # token is the value NIST ships, not a locally computed stand-in
+    # (ADR-0006); it is recorded, not recomputed.
+    for raw in dbhashes.read_text(encoding="utf-8").splitlines():
+        match = _DBHASH.match(raw.strip())
+        if match is not None and match.group("name") == db_name:
+            return match.group("digest").lower()
+    return None
+
+
+_NIST_BASE = "https://s3.amazonaws.com/rds.nsrl.nist.gov/RDS"
+
+_DEFAULT_FAMILY = "modern_minimal"
+
+
+@dataclass
+class FetchedDelta:
+     # One ordered Delta release fetched by the driver, with its zip sidecar.
+    release: str
+    zip: Path
+    sidecar: Path
+
+
+@dataclass
+class FetchedSet:
+     # The full Release + ordered Deltas + per-Release manifests, on disk.
+    release_zip: Path
+    release_sidecar: Path
+    dbhashes: Path
+    signatures: Path
+    deltas: List[FetchedDelta] = field(default_factory=list)
+
+
+class FetchError(RuntimeError):
+      # A required NIST object could not be fetched or was missing.
+    pass
+
+
+def release_zip_name(release, family=_DEFAULT_FAMILY):
+      # The full-Minimal Release archive, by its Release identifier.
+    return f"RDS_{release}_{family}.zip"
+
+
+def delta_zip_name(delta_release, family=_DEFAULT_FAMILY):
+      # A Delta release archive, by its Delta release identifier.
+    return f"RDS_{delta_release}_{family}_delta.zip"
+
+
+def object_url(base, release, name):
+     # NIST's per-Release S3 path: objects are public-read under rds_<id>/.
+    return base + "/rds_" + release + "/" + name
+
+
+def fetch_plan(release, deltas, dest_dir, base=_NIST_BASE,
+               family=_DEFAULT_FAMILY):
+     # The exact NIST object URLs + local destinations for a Release.
+     #
+     # NIST's per-Release S3 path denies anonymous *listing* but serves each
+     # object *public-read*, so the driver probes exact object names derived
+     # from the Release and Delta release identifiers rather than listing the
+     # bucket. Returned in fetch order: the full-Minimal Release zip + its
+     # `.sha`, each ordered Delta release zip + its `.sha`, then the per-Release
+     # `dbhashes.txt` and `signatures.txt`. No URL is hard-coded; each is
+     # derived from the `Release` / `Delta release` identifiers.
+    dest = Path(dest_dir)
+    plan = []
+    rzip = release_zip_name(release, family)
+    plan.append(("release_zip", rzip,
+                 object_url(base, release, rzip), dest / rzip))
+    plan.append(("release_sidecar", rzip + ".sha",
+                 object_url(base, release, rzip + ".sha"),
+                 dest / (rzip + ".sha")))
+    for delta_release in deltas:
+        dzip = delta_zip_name(delta_release, family)
+        plan.append(("delta_zip", delta_release,
+                     object_url(base, delta_release, dzip), dest / dzip))
+        plan.append(("delta_sidecar", delta_release,
+                     object_url(base, delta_release, dzip + ".sha"),
+                     dest / (dzip + ".sha")))
+    plan.append(("dbhashes", None,
+                 object_url(base, release, "dbhashes.txt"),
+                 dest / "dbhashes.txt"))
+    plan.append(("signatures", None,
+                 object_url(base, release, "signatures.txt"),
+                 dest / "signatures.txt"))
+    return plan
+
+
+def _download(opener, url, dest):
+     # Persist one NIST object; a failed or missing object refuses loudly.
+    try:
+        with opener(url) as handle:
+            content = handle.read()
+    except urllib.error.URLError as error:
+        raise FetchError(
+             "cannot fetch " + url + ": " + str(getattr(
+                 error, "reason", error))) from error
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(content)
+    return dest
+
+
+def fetch_set(release, deltas, dest_dir, *,
+              base=_NIST_BASE, family=_DEFAULT_FAMILY,
+              opener=urllib.request.urlopen):
+      # Fetch the full Release + ordered Deltas + per-Release manifests.
+      #
+      # Each required object -- the full-Minimal **Release** zip + its `.sha`
+      # sidecar, every ordered **Delta release** zip + its sidecar, and the
+      # per-Release `dbhashes.txt` / `signatures.txt` -- is probed by exact
+      # name on NIST's per-Release path and written under `dest_dir`. A failed
+      # or missing object surfaces as a `FetchError` (never a silent empty
+      # fetch). The heavy multi-gigabyte download is the operator's step and
+      # is never a build or CI step (ADR-0003); it is injected via `opener` so
+      # the wiring is assertable without the download. No new dependency:
+      # stdlib `urllib`.
+    fetched = FetchedSet(
+         None, None, None, None,
+         [FetchedDelta(delta, None, None) for delta in deltas])
+    for role, marker, url, target in fetch_plan(
+         release, deltas, dest_dir, base=base, family=family):
+        if role == "release_zip":
+            fetched.release_zip = _download(opener, url, target)
+        elif role == "release_sidecar":
+            fetched.release_sidecar = _download(opener, url, target)
+        elif role == "delta_zip":
+            slot = next(item for item in fetched.deltas
+                        if item.release == marker)
+            slot.zip = _download(opener, url, target)
+        elif role == "delta_sidecar":
+            slot = next(item for item in fetched.deltas
+                        if item.release == marker)
+            slot.sidecar = _download(opener, url, target)
+        elif role == "dbhashes":
+            fetched.dbhashes = _download(opener, url, target)
+        elif role == "signatures":
+            fetched.signatures = _download(opener, url, target)
+    return fetched
+
+
+def provision_record(base_path, set_name, release, deltas,
+                     db_name, dbhashes, manifest_path):
+    # Turnkey layer 3: apply the ordered Deltas, read NIST's published
+    # `dbhash` for the Release, and record it in the Provisioning manifest.
+    # It attests the token rather than recomputing it (ADR-0006); the service
+    # then trusts the verified mount (ADR-0005).
+    current = hasheset.provision(base_path,
+                                 Provenance(set_name, release))
+    applied = []
+    for release_name, delta_sql in deltas:
+        current = hasheset.apply_delta(current, delta_sql, release_name)
+        applied.append(release_name)
+    token = read_published_dbhash(dbhashes, db_name)
+    if token is None:
+        raise ValueError(
+            "no published dbhash for " + db_name + " in dbhashes.txt")
+    verified = hasheset.provision(
+        current.path,
+        Provenance(set_name, release, applied, token))
+    record = write_manifest(manifest_path, set_name, release, applied, token)
+    return verified, record
 
 
 def write_manifest(path, set_name, release, deltas, dbhash):
