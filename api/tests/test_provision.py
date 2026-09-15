@@ -2,7 +2,8 @@
 
 The Provisioner verifies a released archive in three layers (zip SHA-1
 sidecar, inner SHA-256 signatures, NIST dbhash), applies the ordered
-deltas, and writes the queryable Hash Set, Sidecar index, and
+deltas, and writes the queryable Hash Set -- with its per-Algorithm hash
+index built into the same database -- and
 Provisioning manifest. These checks exercise that flow on a tiny
 fixture, with the dbhash layer injected (ADR-0006). Layer 3 coexists in
 two forms: the compute-and-compare `verify_dbhash` (the fixture stand-in)

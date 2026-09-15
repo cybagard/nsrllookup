@@ -2,7 +2,8 @@
 
 The driver ties the Provisioner together end to end: fetch (ticket 02),
 verify three layers, apply the ordered Deltas, record NIST's published
-``dbhash`` (ticket 01), and write the queryable Hash Set + Sidecar index +
+``dbhash`` (ticket 01), and write the queryable Hash Set -- with its
+per-Algorithm hash index built into the same database -- plus the
 Provisioning manifest. The checks here exercise that orchestration on a
 tiny fixture with the fetch *stubbed* (a stand-in ``opener`` returns bytes
 for known NIST objects), so the wiring is assertable without the multi-GB

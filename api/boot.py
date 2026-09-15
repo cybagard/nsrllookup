@@ -2,8 +2,9 @@
 
 This is the one place the running service turns a mounted, verified data
 directory into a ready app. The Provisioner (provision.py) writes the
-queryable Hash Set, its Sidecar index, and the Provisioning manifest into the
-writable data dir as a one-time, out-of-band step; at boot the service reads
+queryable Hash Set -- carrying its per-Algorithm hash index in the same
+database -- and the Provisioning manifest into the writable data dir as a
+one-time, out-of-band step; at boot the service reads
 those two artifacts and installs them, so /health reports ready iff the
 Provisioning manifest agrees with the mounted Hash Set (ADR-0005) and each
 Lookup Result carries the final dbhash (ticket 06).
@@ -48,14 +49,14 @@ def bootstrap(data_dir=None, audit_dir=None):
     db_path = os.path.join(data_dir, _DB_NAME)
     if os.path.exists(db_path):
         record = manifest or {}
-        hash_set = hasheset.provision(
+        hash_set = hasheset.HashSet(
             db_path,
             hasheset.Provenance(
                 record.get("set"),
                 record.get("release"),
                 record.get("deltas") or (),
                 record.get("dbhash"),
-            ),
+             ),
         )
     else:
         hash_set = None

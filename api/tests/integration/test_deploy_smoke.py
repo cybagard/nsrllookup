@@ -23,10 +23,11 @@ def _provision_volume(data_dir):
     """Write a real-layout fixture Hash Set + its manifest into the data dir."""
     hasheset.build_minimal_fixture_db(
         str(data_dir / "rds.db"),
-        [{"crc32": "2E19F1E7", "md5": KNOWN_MD5,
-          "sha1": None, "sha256": None,
-          "file_name": "known.bin", "file_size": 11,
-          "package_id": 0}])
+         [{"crc32": "2E19F1E7", "md5": KNOWN_MD5,
+           "sha1": None, "sha256": None,
+           "file_name": "known.bin", "file_size": 11,
+           "package_id": 0}])
+    hasheset.build_hash_index(str(data_dir / "rds.db"))
     (data_dir / "manifest.json").write_text(
         '{"set": "modern", "release": "2026.03.1", '
         '"deltas": ["2026.06.1"], "dbhash": "deadbeef"}')

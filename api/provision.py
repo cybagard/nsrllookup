@@ -7,8 +7,9 @@ name, since the listing is access-denied but the objects are public-read),
 then verifies a released archive in three layers -- the zip's SHA-1 against its
 sidecar, the inner files' SHA-256 against signatures.txt, and NIST's dbhash
 over the final post-delta database against dbhashes.txt -- and applies the
-ordered Deltas, writing the Hash Set's Sidecar index and Provisioning
-manifest. The dbhash layer is an external token function (ADR-0006): NIST's
+ordered Deltas, building the per-Algorithm hash index into the Hash Set's own
+database and writing the Provisioning
+    manifest. The dbhash layer is an external token function (ADR-0006): NIST's
 binary is accepted rather than re-implemented, and is injected so it is
 assertable without the binary present.
 """

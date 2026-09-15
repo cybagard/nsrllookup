@@ -2,11 +2,16 @@
 
 Re-pointed at NIST's real Minimal layout (confirmed in ticket 01 from the
 shipped schema.sql): a `FILE` table, a `DISTINCT_HASH` view, digests stored
-UPPERCASE, no standalone hash index, and `crc32` present but not a supported
-lookup Algorithm. Membership is served by the Sidecar index, materialised
-from the `DISTINCT_HASH` view and UPPERCASED, so it is case-agnostic. This
-is an I/O-bound provision/index check that builds a real SQLite database and
-queries it -- it does not assert lookup-layer SQL internals.
+UPPERCASE, and -- in the raw NIST layout -- no standalone index on the digest
+columns. Membership is served by nsrllookup's own per-Algorithm **hash index**
+(`idx_md5`, `idx_sha1`, `idx_sha256`), a B-tree `CREATE INDEX` built *inside*
+the provisioned database, so a lookup is an indexed on-disk seek rather than a
+raw `FILE` scan and costs O(1) memory. The raw layout ships no such index
+(it is built at provision); a lookup UPPERCASEs the input to match the
+UPPERCASED columns, so it is case-agnostic. `crc32` is present but not a
+supported lookup Algorithm. This is an I/O-bound provision/index check that
+builds a real SQLite database and queries it -- it does not assert lookup-layer
+SQL internals.
 """
 
 import os
@@ -114,7 +119,10 @@ def test_digests_stored_uppercase(hash_set_path):
         conn.close()
 
 
-def test_no_standalone_hash_index(hash_set_path):
+def test_raw_layout_ships_no_hash_index(hash_set_path):
+     # The raw NIST-style layout carries no index on its digest columns;
+     # nsrllookup builds that index *inside* the db at provision, not in the
+     # raw archive.
     conn = sqlite3.connect(hash_set_path)
     try:
         indexes = [info[1] for info in
@@ -124,7 +132,26 @@ def test_no_standalone_hash_index(hash_set_path):
         conn.close()
 
 
-def test_sidecar_index_materialises_distinct_hash(hash_set_path):
+def test_provision_builds_in_database_hash_index(hash_set_path):
+     # Provision adds the per-Algorithm B-tree index (idx_md5, idx_sha1,
+     # idx_sha256) to the same database, so a later lookup is an indexed seek
+     # rather than a raw FILE scan.
+    provision(hash_set_path, Provenance("modern", "2026.03.1"))
+    conn = sqlite3.connect(hash_set_path)
+    try:
+        indexes = [info[1] for info in
+                   conn.execute("PRAGMA index_list({})".format(TABLE))]
+    finally:
+        conn.close()
+    assert "idx_md5" in indexes
+    assert "idx_sha1" in indexes
+    assert "idx_sha256" in indexes
+
+
+def test_membership_is_answered_per_algorithm(hash_set_path):
+      # Membership resolves per Algorithm on the in-database index: each
+      # supported digest is Known under its own algorithm, a bogus digest is
+      # Unknown.
     set_obj = provision(hash_set_path, Provenance("modern", "2026.03.1"))
     assert set_obj.is_known("md5", SAMPLE_MD5)
     assert set_obj.is_known("sha1", SAMPLE_SHA1)

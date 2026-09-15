@@ -7,8 +7,9 @@ verifies the archive in three layers -- the zip **SHA-1** against each
 ``.sha`` sidecar, the inner files' **SHA-256** against each zip's inner
 ``signatures.txt``, and NIST's published **``dbhash``** read from
 ``dbhashes.txt`` (record-and-attest, ticket 01) -- then applies the deltas in
-order, records the published token, and writes the queryable **Hash Set** + its
-**Sidecar index** + the **Provisioning manifest** into the data dir. ``make
+order, records the published token, and writes the queryable **Hash Set** (with
+its per-Algorithm **hash index** built into the same database) + the
+**Provisioning manifest** into the data dir. ``make
 verify`` re-checks an already-provisioned volume.
 
 A layer failure *refuses* the manifest write (ADR-0005): an unverified or
@@ -129,12 +130,12 @@ def _verify_layers(fetched, work_dir, family=_DEFAULT_FAMILY):
 def apply_delta_releases(base, ordered):
     """Apply the ordered **Delta releases** onto the base Set, in order.
 
-    Each Delta is a NIST-ordered ``.sql`` applied by copy-on-apply +
-    ``executescript`` (ticket 04), which rebuilds the **Sidecar index** and
-    refreshes provenance. A Delta already recorded in the base's provenance is a
-    no-op for the ordered list (``apply_delta`` dedupes), so a re-run never
-    duplicates a delta.
-    """
+     Each Delta is a NIST-ordered ``.sql`` script, applied by copy-on-apply + a
+    streaming ``execute`` (ticket 04), refreshing the per-Algorithm
+    **hash index** and provenance. A Delta is streamed from its on-disk path,
+    never whole; one already in the base's provenance is a no-op for the ordered
+    list (``apply_delta`` dedupes), so a re-run never duplicates it.
+     """
     current = base
     for release_name, delta_sql in ordered:
         current = hasheset.apply_delta(current, delta_sql, release_name)
@@ -148,10 +149,11 @@ def provision_release(release, deltas, *,
                       opener=urllib.request.urlopen):
     """The turnkey flow, end to end, writing the volume into the data dir.
 
-    Fetch, verify all three layers, apply the deltas in order, record NIST's
-    published ``dbhash``, and write the queryable **Hash Set** + **Sidecar
-    index** + **Provisioning manifest**. Returns the provisioned Set and the
-    written manifest record.
+     Fetch, verify all three layers, apply the deltas in order, record NIST's
+    published ``dbhash``, and write the queryable **Hash Set**, its per-
+    Algorithm **hash index**, built into the same database, plus the
+    **Provisioning manifest**. Returns the provisioned Set and the written
+    manifest record.
 
     The multi-gigabyte **Release** fetch is the operator's step (ADR-0003);
     ``opener`` is injected so the wiring is assertable without it. Any
@@ -189,7 +191,7 @@ def provision_release(release, deltas, *,
         if sql is None:
             raise IntegrityError(
                 "delta release " + delta.release + " has no .sql script")
-        ordered.append((delta.release, sql.read_text(encoding="utf-8")))
+        ordered.append((delta.release, sql))
     applied = apply_delta_releases(base_set, ordered)
 
     target = data / _DB_NAME
@@ -228,7 +230,7 @@ def verify_release(data_dir):
     result["hash_set"] = "present" if db_path.exists() else "absent"
     if not db_path.exists():
         return VolumeResult(ready=False, checks=result)
-    hash_set = hasheset.provision(
+    hash_set = hasheset.HashSet(
         db_path,
         Provenance(manifest["set"], manifest["release"],
                    tuple(manifest.get("deltas") or ()), manifest["dbhash"]))
