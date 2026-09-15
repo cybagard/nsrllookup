@@ -8,9 +8,28 @@ socket protocol (`nsrllookup.py`): V3 has no maintained `nsrlupdate`, and the da
 queryable as-is, so a custom engine collapses into "open the `.db`, run a query".
 
 Because V3 stores digests UPPERCASE with **no standalone hash index**, a `WHERE
-md5 = '…'` on ~940 M rows is a full scan. To keep lookups fast we **build a hash→known
-index at ingest** (one sidecar index per supported Algorithm — MD5, SHA-1, SHA-256),
-rebuilt when a Delta release is applied.
+md5 = '…'` on ~940 M rows is a full scan. To keep lookups fast we **build a
+hash index at ingest** -- one B-tree `CREATE INDEX` per supported Algorithm
+(`idx_md5`, `idx_sha1`, `idx_sha256`), built when a Delta release is applied.
+
+The index sits **inside the Hash Set's own `.db`**, not as a separate on-disk
+artifact. A membership lookup is `SELECT 1 FROM FILE WHERE <column> = ? LIMIT 1`,
+an indexed B-tree seek that is ~constant in N because the dataset is static after
+provisioning -- and, crucially, it materialises **no in-RAM distinct-digest
+set** (the OOM that a ~430 M-entry × 3-algorithm Python set would cause). Because
+the index lives in the same file as the rows it covers, there is **no second
+dataset** to ship, validate, or keep in sync: the mounted db is both the row
+store and its index. `IF NOT EXISTS` builds make the index idempotent, so
+provisioning over a base that already carries it (or a re-apply) is a no-op. The
+index carries no fact the db lacks, and it does not recompute the dbhash:
+that dataset-integrity token is attested from NIST's `dbhashes.txt`
+(ADR-0006), not derived from the rows. We deliberately **do not** use a separate
+on-disk sidecar copy of `DISTINCT_HASH`: a sidecar is a redundant derived copy
+of information the db already holds, which reintroduces the two-source-of-truth
+and staleness concern the db-attestation model (ADR-0006: trust the verified
+mount, don't recompute) is trying to avoid -- and a read-only mount could not
+rebuild it, so it would have to be shipped. Folding the index into the db gives
+the same indexed seek with none of that cost.
 
 - **Status**: accepted
 - **Considered Options**: embed the set in-process (rejected: even the minimal 18 GB is

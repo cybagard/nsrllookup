@@ -7,8 +7,9 @@ unverified or stale volume could answer. So we make the **Provisioner**'s one-ti
 — the **Provisioning manifest** (the **Set**, **Release**, ordered **Delta releases**, and the
 three integrity values) — the thing the service checks at startup. The service is **ready** only
 when the manifest is present **and** its integrity still matches the mounted **Hash Set**;
-otherwise it reports not-ready and serves nothing. The persisted **Sidecar index** records the
-**dbhash** + **Release** it was built from and refuses to serve on mismatch.
+otherwise it reports not-ready and serves nothing. The **Provisioning manifest** records the
+**dbhash** + **Release** (+ ordered Deltas) the volume was built from and is the check `verify_readiness`
+runs at boot; a mismatch refuses the volume.
 
 - **Status**: accepted
 - **Considered Options**: recompute the full NIST integrity chain at boot (rejected: the
@@ -24,5 +25,7 @@ otherwise it reports not-ready and serves nothing. The persisted **Sidecar index
    the final **dbhash** (the minimal fields to re-verify against `dbhashes.txt`); the full
    triple (zip SHA-1, inner SHA-256 signatures) and the ordered per-delta `dbhash` chain live
    in the manifest / `/health`, not repeated per result; `/health` surfaces `ready` plus the
-   dataset identity; the manifest and index live in the **writable** data dir, separate from
-   the read-only mount of the **Hash Set**.
+    dataset identity; the **Provisioning manifest** lives in the **writable**
+     data dir, separate from the read-only mount of the **Hash Set** -- the
+     per-Algorithm hash index lives *inside* the mounted `rds.db` itself, not
+     beside it.

@@ -4,9 +4,9 @@ Proves the re-based reader + delta apply + `dbhash` against a real NIST database
 that exists -- `RDS_2021.12.2_curated` (~86.9 MiB). This is a *mechanics* proof:
 the curated release is a *different*, older schema (`METADATA` source table + a
 6-column `FILE` view, no `DISTINCT_HASH` view, no `crc32` in `FILE`), so it proves
-the `executescript` apply + index rebuild + `dbhash`/read path works on a real NIST
-db, **not** a Minimal-layout proof. The Minimal layout is proven in (a) against
-NIST's shipped `schema.sql`.
+the streaming apply + per-Algorithm hash-index build + `dbhash`/read path works on
+a real NIST db, **not** a Minimal-layout proof. The Minimal layout is proven in (a)
+against NIST's shipped `schema.sql`.
 
 It runs no CI and is not part of the automated suite (real-data I/O is multi-GB).
 The `dbhash` layer uses an ADR-0006 stand-in token function: `dbhash` is NIST's
@@ -52,11 +52,11 @@ def add_distinct_hash_view(conn):
     """The one adaptation a non-Minimal layout needs to serve the reader.
 
     The Minimal layout ships a `DISTINCT_HASH(sha256,sha1,md5,crc32)` view that
-    the Sidecar index materialises. The curated release has no such view and its
-    `FILE` view carries no `crc32` column, so for this mechanics proof we add a
-    DISTINCT view over the curated `FILE` view (3 digest columns). This is the
-    reader seam; it is the only schema difference the mechanics must bridge.
-    """
+    backs the per-Algorithm hash index. The curated release has no such view and
+     its `FILE` view carries no `crc32` column, so for this mechanics proof we add
+    a DISTINCT view over the curated `FILE` view (3 digest columns). This is the
+     reader seam; it is the only schema difference the mechanics must bridge.
+      """
     conn.execute("CREATE VIEW DISTINCT_HASH AS "
                  "SELECT DISTINCT sha256, sha1, md5 FROM FILE")
     conn.commit()
@@ -114,15 +114,22 @@ def main():
         set_obj = hasheset.provision(
             base_path,
             hasheset.Provenance("curated", "2021.12.2", dbhash=None))
-        n_sha256 = len(set_obj._index["sha256"])
-        check("reader: real db materialises a distinct-sha256 index",
-              n_sha256 == 408811, "distinct sha256 = " + str(n_sha256))
+        # The membership index is a B-tree built *inside* the db, not an in-RAM set.
+        idx_conn = sqlite3.connect(base_path)
+        try:
+            index_names = [row[1] for row in
+                           idx_conn.execute("PRAGMA index_list(FILE)")]
+        finally:
+            idx_conn.close()
+        check("reader: a per-Algorithm hash index is built into the db",
+             "idx_sha256" in index_names,
+              "indexes=" + str(index_names))
         check("reader: a real digest is KNOWN",
-              set_obj.is_known("sha256", KNOWN_SHA256))
+             set_obj.is_known("sha256", KNOWN_SHA256))
         check("reader: an absent digest is UNKNOWN",
-              not set_obj.is_known("sha256", UNKNOWN_SHA256))
+             not set_obj.is_known("sha256", UNKNOWN_SHA256))
         check("reader: membership is case-agnostic (lowercase resolves)",
-              set_obj.is_known("sha256", KNOWN_SHA256.lower()))
+             set_obj.is_known("sha256", KNOWN_SHA256.lower()))
 
         # Full per-result path through the lookup seam.
         looked = lookup.look_up(set_obj, [KNOWN_SHA256, UNKNOWN_SHA256], "sha256")

@@ -65,13 +65,16 @@ The on-disk shape of a Minimal **Set**: a `FILE` table
 _Avoid_: METADATA table (the per-file table is `FILE`), md5sha1 (no such column),
 filename (the column is `file_name`)
 
-**Sidecar index**:
-nsrllookup's own membership index — the distinct digests materialised from the
-`DISTINCT_HASH` view (per **Algorithm**), persisted alongside the mounted Hash Set. It is
-replaced when a **Delta release** is applied, so a stale index never answers against newer
-data.
-_Avoid_: the raw FILE scan (the index is the view, not the ~430 M raw rows), the mounted
-database itself
+**Hash index**:
+nsrllookup's own membership index — a per-**Algorithm** B-tree `CREATE INDEX`
+(`idx_md5`, `idx_sha1`, `idx_sha256`) built **inside the Hash Set's own
+`.db`**, not a separate on-disk artifact. A lookup is an indexed on-disk seek,
+not a raw `FILE` scan, and materialises no in-RAM digest copy. It is rebuilt
+when a **Delta release** is applied, so a stale index never answers against
+newer data. It lives in the same file as the rows it covers, so there is no
+second dataset to keep in sync, and it does not recompute the **dbhash**.
+_Avoid_: the raw FILE scan (the index is the seek, not the ~430 M raw rows),
+the mounted database itself, an on-disk sidecar copy of DISTINCT_HASH
 
 **dbhash**:
 NIST's dataset-integrity token for a **Release**: a hash of the final post-delta database,
@@ -122,9 +125,9 @@ _Avoid_: log line, hit (use Audit Entry)
 **Provisioner**:
 The operator-run, out-of-band step that builds a queryable **Hash Set**: fetch a **Release**
 and its ordered **Delta releases**, verify their integrity (zip SHA-1 sidecar, inner SHA-256
-signatures, and NIST's **dbhash**), apply the deltas in order, and write the **Hash Set**,
-a persisted **Sidecar index**, and a **Provisioning manifest**. It never runs at build or CI
-time, and the service never provisions for itself.
+signatures, and NIST's **dbhash**), apply the deltas in order, build the per-Algorithm
+**hash index** into the Hash Set's own database, and write a **Provisioning manifest**. It
+never runs at build or CI time, and the service never provisions for itself.
 _Avoid_: ingester, loader (at boot time, which the service does not do)
 
 **Provisioning manifest**:

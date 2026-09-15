@@ -20,8 +20,10 @@ The engine queries NIST's RDS **V3** Minimal **Set** (a SQLite **Hash Set**,
 mounted read-only) directly. Its on-disk shape is NIST's real **Set schema**:
 a `FILE` table (`sha256, sha1, md5, crc32, file_name, file_size, package_id`)
 and a `DISTINCT_HASH` view over it; `crc32` is a physical column but not a lookup
-**Algorithm**. Membership is served by a per-Algorithm `hash→known` **Sidecar
-index** materialised from that view; the retired `nsrlsvr` daemon and its socket
+**Algorithm**. Membership is served by a per-Algorithm `hash→known` **hash index**
+(a B-tree `CREATE INDEX` on each digest column, `idx_md5`/`idx_sha1`/`idx_sha256`,
+built **inside the mounted `.db`**), so a lookup is an indexed on-disk seek that
+costs no RAM; the retired `nsrlsvr` daemon and its socket
 protocol are gone. See `docs/adr/0001..0006` and
 `.scratch/rds-v3-live/spec.md`.
 
@@ -31,26 +33,28 @@ protocol are gone. See `docs/adr/0001..0006` and
    **Hash Set** access, and the **Audit Trail**. There is no separate server.
 - **Mounted volume.** The **Provisioner** produces a queryable **Hash Set** (one
     full **Release** plus any applied **Delta releases**, applied as NIST's ordered
-    `.sql`), a persisted **Sidecar index**, and a **Provisioning manifest**, all
-    mounted read-only. The Audit Trail is mounted read-write for durability.
+     `.sql`) whose per-Algorithm **hash index** is built into the same `.db`,
+    written alongside a **Provisioning manifest**, all mounted read-only. The Audit
+     Trail is mounted read-write for durability.
 - **Proving the mount.** The **Provisioner** verifies integrity in three layers —
-    zip **SHA-1** sidecar, inner **SHA-256** `signatures`, and NIST's **dbhash**
-    over the final post-delta database — and records all three in the **Provisioning
-    manifest**.
+     zip **SHA-1** sidecar, inner **SHA-256** `signatures`, and NIST's **dbhash**
+     over the final post-delta database — and records all three in the **Provisioning
+     manifest**.
 - **Readiness gate.** At startup the service is **ready** only when the
-    **Provisioning manifest** is present and its integrity values (including the
-    final **dbhash**) still match the mounted **Hash Set**; a missing or mismatched
-    manifest means **not-ready**, so a stale index never answers against newer data.
-    The container trusts the verified mount and does not recompute **dbhash** at boot.
+     **Provisioning manifest** is present and its integrity values (including the
+     final **dbhash**) still match the mounted **Hash Set**; a missing or mismatched
+     manifest means **not-ready**, so a stale index never answers against newer data.
+     The container trusts the verified mount and does not recompute **dbhash** at boot.
 - **Provisioning is one-time.** The **Provisioner** (mount, apply deltas in order,
-    verify, write) is an operational step done out of band, never a build or CI step.
+     verify, write) is an operational step done out of band, never a build or CI step.
 
 ## How to use (single service, mounted volume)
 
 1. Provision the **Hash Set** volume out of band: the **Provisioner** fetches NIST's
      Minimal **Set** **Release** and its **Delta releases**, verifies integrity in
-     three layers, applies the deltas in order, and writes the **Hash Set**, the
-     **Sidecar index**, and the **Provisioning manifest** into the data dir.
+     three layers, applies the deltas in order (building the per-Algorithm hash index
+     into the same `.db`), and writes the **Hash Set** and the **Provisioning
+     manifest** into the data dir.
 2. Start the API against that mounted volume:
 
     ```shell script
