@@ -6,3 +6,6 @@
 *.db
 *.sha
 *.bin
+
+# 18 GiB proof workspace; its dbhashes.txt duplicates extracted/dbhashes.txt
+proof_work/
