@@ -1,6 +1,6 @@
 # 06 — pytest suite + CI test job
 
-Status: open
+Status: resolved — pytest + CI test job in `rds-v3-migration/02`+`03` (commit `74cf77d`)
 Type: task
 Blocked by: 05
 

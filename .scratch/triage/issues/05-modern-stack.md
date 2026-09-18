@@ -1,6 +1,6 @@
 # 05 — Modern dependency stack
 
-Status: open
+Status: resolved — modern stack (Py3.12/Flask3/waitress3, drop nose/Paste) in `rds-v3-migration/01` (commit `74cf77d`)
 Type: task
 Blocked by: none
 

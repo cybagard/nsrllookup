@@ -1,6 +1,6 @@
 # 08 — Audit trail for lookups
 
-Status: open
+Status: resolved — Audit Trail in `rds-v3-migration/09`+`12` (commit `2a5b904`)
 Type: task
 Blocked by: 04
 

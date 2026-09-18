@@ -1,6 +1,6 @@
 # 04 — POST /check multi-algorithm API + full provenance
 
-Status: open
+Status: resolved — `POST /check` multi-algorithm + provenance (commit `74cf77d`, `2a5b904`)
 Type: task
 Blocked by: 03
 

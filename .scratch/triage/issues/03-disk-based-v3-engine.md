@@ -1,6 +1,6 @@
 # 03 — Query the RDS V3 (SQLite) directly, with a hash index
 
-Status: open
+Status: resolved — SQLite engine + in-db index landed in `rds-v3-live/03` (commit `36c0350`, `0af05af`)
 Type: task
 Blocked by: 01
 

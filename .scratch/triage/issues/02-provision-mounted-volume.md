@@ -1,6 +1,6 @@
 # 02 — Provision the RDS into a mounted volume
 
-Status: open
+Status: resolved — succeeded by `rds-v3-live/05` + turnkey driver (commit `5671832`, `3556c3e`)
 Type: task
 Blocked by: none
 

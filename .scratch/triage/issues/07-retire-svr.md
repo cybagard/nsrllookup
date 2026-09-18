@@ -1,6 +1,6 @@
 # 07 — Retire svr/ + update README/compose
 
-Status: open
+Status: resolved — `svr/` + `nsrllookup.py` retired in `rds-v3-migration/13` (commit `2a5b904`)
 Type: task
 Blocked by: 03, 04
 

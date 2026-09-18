@@ -1,6 +1,6 @@
 # 01 — Learn the on-disk V3 layout
 
-Status: open
+Status: resolved — confirmed by `rds-v3-migration/04` + `rds-v3-live/01` (commit `3ba267c`)
 Type: research
 Blocked by: none
 
