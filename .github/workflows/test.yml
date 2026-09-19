@@ -32,6 +32,6 @@ jobs:
 
         # This job runs the self-contained fixture-based suite: no Hash Set and
         # no live server are needed.
-        - name: Run test suite with coverage
-         working-directory: api
-         run: pytest --cov=. --cov-report=term-missing --cov-report=xml
+      - name: Run test suite with coverage
+        working-directory: api
+        run: pytest --cov=. --cov-report=term-missing --cov-report=xml
