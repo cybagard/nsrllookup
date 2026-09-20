@@ -5,8 +5,9 @@ together end to end: ``make provision`` fetches the full Minimal **Release**
 and its ordered **Delta releases** from NIST (ticket 02's ``fetch_set``),
 verifies the archive in three layers -- the zip **SHA-1** against each
 ``.sha`` sidecar, the inner files' **SHA-256** against each zip's inner
-``signatures.txt``, and NIST's published **``dbhash``** read from
-``dbhashes.txt`` (record-and-attest, ticket 01) -- then applies the deltas in
+``signatures.txt``, and NIST's published **``dbhash``** read from the
+terminal release's ``dbhashes.txt`` (record-and-attest, ticket 01) -- then
+applies the deltas in
 order, records the published token, and writes the queryable **Hash Set** (with
 its per-Algorithm **hash index** built into the same database) + the
 **Provisioning manifest** into the data dir. ``make
@@ -25,6 +26,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import tempfile
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -107,10 +109,14 @@ def _verify_layers(fetched, work_dir, family=_DEFAULT_FAMILY):
     missing, or unattested artifact is caught and the **Hash Set** is never
     produced (ADR-0005). Layer 1 is the zip **SHA-1** vs its sidecar; layer 2
     is the inner files' **SHA-256** vs each zip's inner ``signatures.txt``;
-    layer 3 is NIST's published **``dbhash``** read from ``dbhashes.txt`` and
-    recorded, not recomputed (ADR-0006).
+    layer 3 is NIST's published **``dbhash``** read from the terminal
+    release's ``dbhashes.txt`` -- for the final post-Delta database, since
+    only the terminal release's file carries that token -- and recorded, not
+    recomputed (ADR-0006).
     """
     release = release_from_zip(fetched.release_zip.name, family)
+    terminal = provision.terminal_release(
+        release, [delta.release for delta in fetched.deltas])
     inner = {}
     for zip_path, sidecar in _bases(fetched):
         if not provision.verify_zip_sha(zip_path, sidecar):
@@ -123,11 +129,51 @@ def _verify_layers(fetched, work_dir, family=_DEFAULT_FAMILY):
             raise IntegrityError("layer 2 failed for " + str(zip_path.name))
         inner[zip_path.name] = extracted
     token = provision.read_published_dbhash(
-        fetched.dbhashes, final_db_name(release, family))
+        fetched.dbhashes, final_db_name(terminal, family))
     return token, inner
 
 
-def apply_delta_releases(base, ordered):
+def _inside_resolved(path, root):
+    """True iff `path` resolves to a file inside `root` (ADR-0005 scoping)."""
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        return False
+    if not resolved.is_file():
+        return False
+    try:
+        resolved.relative_to(Path(root).resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _remove_if_scratch(path, scratch_dirs):
+    """Remove a scratch database only if it sits inside a scratch root.
+
+    The turnkey run's intermediates -- the per-apply copy-on-apply database
+    and the base's working copy -- are deleted as they are superseded, so the
+    run leaves no multi-hundred-GiB scratch trail (ADR-0003). The unlink is
+    resolved and scoped: anything outside the given roots (a mounted volume,
+    the data dir) is never touched (ADR-0005).
+    """
+    for root in scratch_dirs:
+        if _inside_resolved(path, root):
+            Path(path).unlink()
+            return
+
+
+def _scratch_dirs(work_dir):
+    """The run's scratch roots: its work dir and the system temp dir.
+
+    ``apply_delta``'s copy-on-apply copies land in the system temp dir
+    (``tempfile.mkstemp``), the base working copy in the work dir; both are
+    disposable scratch, never the data volume.
+    """
+    return (Path(work_dir), Path(tempfile.gettempdir()))
+
+
+def apply_delta_releases(base, ordered, scratch_dirs=()):
     """Apply the ordered **Delta releases** onto the base Set, in order.
 
      Each Delta is a NIST-ordered ``.sql`` script, applied by copy-on-apply + a
@@ -135,10 +181,15 @@ def apply_delta_releases(base, ordered):
     **hash index** and provenance. A Delta is streamed from its on-disk path,
     never whole; one already in the base's provenance is a no-op for the ordered
     list (``apply_delta`` dedupes), so a re-run never duplicates it.
+    Scratch hygiene: when `scratch_dirs` is given, each superseded database is
+    removed after its successor is produced, iff it resolves inside one of the
+    roots (ADR-0003/ADR-0005).
      """
     current = base
     for release_name, delta_sql in ordered:
+        superseded = current
         current = hasheset.apply_delta(current, delta_sql, release_name)
+        _remove_if_scratch(superseded.path, scratch_dirs)
     return current
 
 
@@ -161,6 +212,13 @@ def provision_release(release, deltas, *,
     or partially-applied **Hash Set** is never produced (ADR-0005). The final
     **``dbhash``** is NIST's published value, recorded (attested), not
     recomputed (ADR-0006).
+
+    Scratch hygiene keeps the run from peaking at triple the final volume:
+    the base's extracted tree is removed once its database has been copied to
+    the work dir, each superseded copy-on-apply database is removed once its
+    successor exists, and the final applied database is removed once copied
+    into the data dir -- in every case only when the path resolves inside the
+    run's work dir or the system temp dir, never the data volume (ADR-0005).
     """
     base_url = base if base is not None else _NIST_BASE
     work = Path(work_dir)
@@ -171,10 +229,12 @@ def provision_release(release, deltas, *,
     fetched = provision.fetch_set(
         release, deltas, work, base=base_url, family=family, opener=opener)
 
+    terminal = provision.terminal_release(
+        release, [delta.release for delta in fetched.deltas])
     token, inner = _verify_layers(fetched, work_dir, family=family)
     if token is None:
         raise IntegrityError(
-            "no published dbhash for " + final_db_name(release, family)
+            "no published dbhash for " + final_db_name(terminal, family)
             + " in dbhashes.txt")
 
     base_db = _find(inner[fetched.release_zip.name], ".db")
@@ -182,6 +242,7 @@ def provision_release(release, deltas, *,
         raise IntegrityError("release zip has no base .db for " + release)
     base_path = work / "base.db"
     shutil.copyfile(base_db, base_path)
+    shutil.rmtree(base_db.parent, ignore_errors=True)
     base_set = hasheset.provision(base_path, Provenance(set_name, release))
 
     ordered = []
@@ -192,10 +253,12 @@ def provision_release(release, deltas, *,
             raise IntegrityError(
                 "delta release " + delta.release + " has no .sql script")
         ordered.append((delta.release, sql))
-    applied = apply_delta_releases(base_set, ordered)
+    scratch = _scratch_dirs(work)
+    applied = apply_delta_releases(base_set, ordered, scratch)
 
     target = data / _DB_NAME
     shutil.copyfile(applied.path, target)
+    _remove_if_scratch(applied.path, scratch)
     record = provision.write_manifest(
         data / MANIFEST_NAME, set_name, release,
         applied.provenance.deltas, token)

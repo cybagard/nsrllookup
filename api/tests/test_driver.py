@@ -12,6 +12,7 @@ download, which stays the operator's step (ADR-0003).
 
 import hashlib
 import io
+import tempfile
 import urllib.error
 import zipfile
 
@@ -20,6 +21,7 @@ from hasheset import build_delta_sql
 from hasheset import build_minimal_fixture_db
 from hasheset import verify_readiness
 
+from driver import _remove_if_scratch
 from driver import apply_delta_releases
 from driver import IntegrityError
 from driver import provision_release
@@ -97,17 +99,19 @@ def _build_delta_zip(tmp_path, delta_release, row):
 
 
 class _Handle:
-    # A stand-in for urllib's opened object: a context manager with .read().
+    # A stand-in for urllib's opened object: a real stream with .read(size)
+    # semantics (b"" at EOF), which the chunked download loop relies on.
     def __init__(self, content):
-        self._content = content
+        self._stream = io.BytesIO(content)
 
-    def read(self):
-        return self._content
+    def read(self, size=-1):
+        return self._stream.read(size)
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
+        self._stream.close()
         return False
 
 
@@ -140,10 +144,17 @@ def _store(tmp_path):
            _BASE + "/rds_" + _DELTA_2 + "/" + d2: delta2_zip,
            _BASE + "/rds_" + _DELTA_2 + "/" + d2 + ".sha":
                 _sha1_sidecar(d2, hashlib.sha1(delta2_zip).hexdigest()),
-           _BASE + "/rds_" + _RELEASE + "/dbhashes.txt":
-                 (_DBHASH + " RDS_" + _RELEASE + "_modern_minimal.db\n").encode(),
-           _BASE + "/rds_" + _RELEASE + "/signatures.txt": b"",
-        }
+         }
+    # The plan fetches the terminal release's dbhashes.txt, and the driver
+    # looks up the final post-delta db's token in it; terminal depends on the
+    # Delta list each test passes, so it is stood up under every release dir
+    # carrying the token for every possible final db. There is no top-level
+    # signatures.txt object: each zip carries its inner one (layer 2).
+    for release in (_RELEASE, _DELTA_1, _DELTA_2):
+        lines = "\n".join(
+             _DBHASH + " RDS_" + terminal + "_modern_minimal.db"
+             for terminal in (_RELEASE, _DELTA_1, _DELTA_2)) + "\n"
+        store[_BASE + "/rds_" + release + "/dbhashes.txt"] = lines.encode()
     return store, row_d1, row_d2
 
 
@@ -165,6 +176,10 @@ def test_provision_applies_deltas_in_order(tmp_path):
     assert record["release"] == _RELEASE
     assert hash_set.is_known("md5", "AAAA4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A")
     assert hash_set.is_known("md5", "11111111111111111111111111111111")
+    # Scratch hygiene: the superseded base working copy is gone, the volume
+    # in the data dir is what remains (ADR-0003).
+    assert not (tmp_path / "work" / "base.db").exists()
+    assert (tmp_path / "data" / "rds.db").exists()
 
 
 def test_manifest_round_trips_through_read_manifest(tmp_path):
@@ -246,3 +261,34 @@ def test_reapply_is_a_noop_for_ordered_list(tmp_path):
     sql_text = build_delta_sql([row_d1])
     redone = apply_delta_releases(set_obj, [(_DELTA_1, sql_text)])
     assert list(redone.provenance.deltas) == [_DELTA_1]
+
+
+def test_scratch_unlink_never_touches_paths_outside_roots(tmp_path):
+    # A database outside the scratch roots survives; one inside is removed.
+    work = tmp_path / "work"
+    work.mkdir()
+    inside = work / "stale.db"
+    inside.write_bytes(b"scratch")
+    outside = tmp_path / "keep.db"
+    outside.write_bytes(b"not scratch")
+    _remove_if_scratch(inside, (work,))
+    assert not inside.exists()
+    _remove_if_scratch(outside, (work,))
+    assert outside.exists()
+
+
+def test_hygiene_removes_tmp_intermediates(tmp_path, monkeypatch):
+    # Copy-on-apply scratch dbs are removed as the run progresses.
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    tmp_root = tmp_path / "scratch_tmp"
+    tmp_root.mkdir()
+    real_mkstemp = tempfile.mkstemp
+
+    def fake_mkstemp(suffix=".db"):
+        return real_mkstemp(suffix=suffix, dir=str(tmp_root))
+
+    monkeypatch.setattr("hasheset.tempfile.mkstemp", fake_mkstemp)
+    _provision(tmp_path, [_DELTA_1, _DELTA_2], store=store)
+    assert list(tmp_root.glob("*.db")) == []
+    assert not (tmp_path / "work" / "base.db").exists()
+    assert (tmp_path / "data" / "rds.db").exists()
