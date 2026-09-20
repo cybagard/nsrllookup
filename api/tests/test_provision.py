@@ -13,6 +13,7 @@ path). Real multi-giB data stays an operator step.
 """
 
 import hashlib
+import io
 import urllib.error
 
 from hasheset import build_delta_sql
@@ -296,17 +297,19 @@ _NIST_BASE = "https://s3.amazonaws.com/rds.nsrl.nist.gov/RDS"
 
 
 class _Handle:
-     # A stand-in for urllib's opened object: a context manager with .read().
+    # A stand-in for urllib's opened object: a real stream with .read(size)
+    # semantics (b"" at EOF), which the chunked download loop relies on.
     def __init__(self, content):
-        self._content = content
+        self._stream = io.BytesIO(content)
 
-    def read(self):
-        return self._content
+    def read(self, size=-1):
+        return self._stream.read(size)
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
+        self._stream.close()
         return False
 
 
@@ -325,16 +328,25 @@ def test_plan_derives_object_names_from_identifiers():
     roles = [role for role, *_ in plan]
     assert roles == [
          "release_zip", "release_sidecar", "delta_zip", "delta_sidecar",
-         "delta_zip", "delta_sidecar", "dbhashes", "signatures"
+         "delta_zip", "delta_sidecar", "dbhashes"
      ]
     urls = [url for _role, _marker, url, _target in plan]
      # No URL is hard-coded; each carries the per-Release path rds_<id>/.
     assert any("/rds_2026.09.1/" in url for url in urls)
     assert "/rds_2026.03.1/" in urls[4]
-    assert any(url.endswith("dbhashes.txt") for url in urls)
-    assert any(url.endswith("signatures.txt") for url in urls)
+    # Only the terminal release's dbhashes.txt is fetched, never a top-level
+    # signatures.txt (none exists on NIST; each zip carries its inner one).
+    assert urls[6] == _NIST_BASE + "/rds_2026.03.1/dbhashes.txt"
+    assert not any(url.endswith("signatures.txt") for url in urls)
     assert "RDS_2026.09.1_modern_minimal.zip" in urls[0]
     assert "RDS_2026.03.1_modern_minimal_delta.zip" in urls[4]
+
+
+def test_plan_uses_base_dbhashes_with_no_deltas():
+    # With no Deltas the terminal release is the Release itself.
+    plan = fetch_plan("2026.09.1", [], "/tmp/x")
+    urls = [url for _role, _marker, url, _target in plan]
+    assert urls[-1] == _NIST_BASE + "/rds_2026.09.1/dbhashes.txt"
 
 
 def test_fetch_set_pulls_release_and_deltas(tmp_path):
@@ -354,8 +366,9 @@ def test_fetch_set_pulls_release_and_deltas(tmp_path):
             b"delta-03",
         base + "/rds_2026.03.1/"
              "RDS_2026.03.1_modern_minimal_delta.zip.sha": b"SHA1=feed\n",
-        base + "/rds_2026.09.1/dbhashes.txt": b"db",
-        base + "/rds_2026.09.1/signatures.txt": b"sigs",
+        # The terminal release's (last Delta's) dbhashes.txt, not a
+        # top-level signatures.txt (which does not exist on NIST).
+        base + "/rds_2026.03.1/dbhashes.txt": b"db",
      }
     fetched = fetch_set(
          "2026.09.1", ["2026.06.1", "2026.03.1"], dest,
@@ -368,7 +381,6 @@ def test_fetch_set_pulls_release_and_deltas(tmp_path):
     assert fetched.deltas[0].sidecar.read_bytes() == b"SHA1=cafe\n"
     assert fetched.deltas[1].zip.read_bytes() == b"delta-03"
     assert fetched.dbhashes.read_bytes() == b"db"
-    assert fetched.signatures.read_bytes() == b"sigs"
 
 
 def test_fetch_missing_object_surfaces(tmp_path):
