@@ -12,9 +12,8 @@ is recorded in a durable, append-only **Audit Trail** instead of being gated.
 
 | Service | main |
 |---------|------|
-| Quality | [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f5b1705369794e52b5b46ec11261d46d)](https://app.codacy.com/gh/cybagard/nsrllookup/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=cybagard/nsrllookup&amp;utm_campaign=Badge_Grade) |
-| API     | ![Docker Pulls](https://img.shields.io/docker/pulls/cybagard/nsrllookup-api) |
-|         | ![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/cybagard/nsrllookup-api) |
+| CI    | [![Test](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml) |
+| Image | [![Build & Scan](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml) |
 
 The engine queries NIST's RDS **V3** Minimal **Set** (a SQLite **Hash Set**,
 mounted read-only) directly. Its on-disk shape is NIST's real **Set schema**:
@@ -71,6 +70,11 @@ download). A fixture **Hash Set** + manifest boot smoke
 (`tests/integration/test_deploy_smoke.py`) drives the whole path —
 `/health` **ready** with a **dbhash**-bearing `dataset`, `/check` **known**, and
 an empty-volume control that stays **not-ready**.
+
+    ```shell script
+   docker-compose -f docker-compose.build.yml up --build api-test && \
+   docker-compose -f docker-compose.build.yml rm -fsv api-test
+    ```
 
 ## API
 
