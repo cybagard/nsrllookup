@@ -166,9 +166,21 @@ From the user's perspective:
    bucket **listing is access-denied**, but individual objects are **public-read**), so the
    driver **probes exact object names** under the per-Release path rather than listing.
    Objects are the full-Minimal **Release** zip + its `.sha` sidecar, the per-**Delta
-   release** zip(s) + sidecars, and the per-release `dbhashes.txt` / `signatures.txt`.
+   release** zip(s) + sidecars, and the **terminal release's** `dbhashes.txt`. There is no
+   top-level `signatures.txt` on NIST (live probes 403; the release README lists the
+   objects without one) — each archive carries its *inner* `signatures.txt`, which the
+   signature layer verifies from the extracted tree — so the plan carries exactly one
+   per-Release text object, and it is the terminal release's `dbhashes.txt`.
    The driver does not hard-code a single URL; it derives object names from the **Release**
    and **Delta release** identifiers.
+- **Bounded footprint.** The uncapped turnkey run is bounded at one full **database** plus
+  the archive — ~260 GiB on one volume for the current Set (ADR-0007): the Deltas apply
+  **in place** on the run's scratch working copy (copy-on-apply remains the protection for
+  trusted mounted volumes, ADR-0005), the extracted base and the finished database publish
+  by **same-volume rename** (a streamed copy only across volumes), and the fetch **resumes**
+  objects already on disk. The real-data proof (ticket 04) pre-flights the volume and
+  records the measured peak, so the run fits a small machine in the dev container instead
+  of the previous 500–730 GiB peak that took the Docker VM's ext4 down.
 - **Manifest + provenance unchanged in shape.** The **Provisioning manifest** keeps its
    fields (Set, Release, ordered Delta releases, final `dbhash`) and the **Lookup Result**'s
    `dataset` block keeps `set`, `release`, ordered `deltas`, `dbhash` — stable contract for

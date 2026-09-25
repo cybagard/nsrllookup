@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import urllib.error
 import urllib.request
@@ -39,12 +40,23 @@ _DBHASH = re.compile(
         r"^[ \t]*(?P<digest>[0-9a-fA-F]+) +(?P<name>\S+\.db)$")
 
 
+def _digest_file(path: Path, algorithm: str) -> str:
+    # Digest a file by streaming it in 1 MiB chunks, never whole: the base
+    # database alone is ~169 GiB uncompressed, so a whole-object read will
+    # not fit process memory.
+    hasher = hashlib.new(algorithm)
+    with open(path, "rb") as handle:
+        while chunk := handle.read(1 << 20):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def verify_zip_sha(zip_path: Path, sidecar: Path) -> bool:
     # Layer 1: the zip's SHA-1 matches its sidecar (NIST's `SHA1` file).
     expected = _expected_line(sidecar)
     if expected is None:
         return False
-    return hashlib.sha1(zip_path.read_bytes()).hexdigest() == expected.lower()
+    return _digest_file(zip_path, "sha1") == expected.lower()
 
 
 def verify_signatures(signed_dir: Path, signatures: Path) -> bool:
@@ -56,7 +68,7 @@ def verify_signatures(signed_dir: Path, signatures: Path) -> bool:
         name, expected = match.group("name"), match.group("digest")
         if not (signed_dir / name).exists():
             return False
-        actual = hashlib.sha256((signed_dir / name).read_bytes()).hexdigest()
+        actual = _digest_file(signed_dir / name, "sha256")
         if actual != expected.lower():
             return False
     return True
@@ -96,11 +108,13 @@ class FetchedDelta:
 
 @dataclass
 class FetchedSet:
-     # The full Release + ordered Deltas + per-Release manifests, on disk.
+    # The full Release + ordered Deltas + the terminal release's
+    # `dbhashes.txt`, on disk. There is no top-level `signatures.txt` to
+    # fetch: NIST publishes its inside each archive (layer 2 verifies it from
+    # the extracted tree).
     release_zip: Path
     release_sidecar: Path
     dbhashes: Path
-    signatures: Path
     deltas: List[FetchedDelta] = field(default_factory=list)
 
 
@@ -124,17 +138,30 @@ def object_url(base, release, name):
     return base + "/rds_" + release + "/" + name
 
 
+def terminal_release(release, deltas):
+    # The terminal post-delta Release: the last ordered Delta release, or the
+    # Release itself when no Delta is applied. The driver derives both the
+    # final database name (whose token `dbhashes.txt` must carry) and the
+    # `dbhashes.txt` object to fetch from it.
+    return deltas[-1] if deltas else release
+
+
 def fetch_plan(release, deltas, dest_dir, base=_NIST_BASE,
                family=_DEFAULT_FAMILY):
-     # The exact NIST object URLs + local destinations for a Release.
-     #
-     # NIST's per-Release S3 path denies anonymous *listing* but serves each
-     # object *public-read*, so the driver probes exact object names derived
-     # from the Release and Delta release identifiers rather than listing the
-     # bucket. Returned in fetch order: the full-Minimal Release zip + its
-     # `.sha`, each ordered Delta release zip + its `.sha`, then the per-Release
-     # `dbhashes.txt` and `signatures.txt`. No URL is hard-coded; each is
-     # derived from the `Release` / `Delta release` identifiers.
+      # The exact NIST object URLs + local destinations for a Release.
+      #
+      # NIST's per-Release S3 path denies anonymous *listing* but serves each
+      # object *public-read*, so the driver probes exact object names derived
+      # from the Release and Delta release identifiers rather than listing the
+      # bucket. Returned in fetch order: the full-Minimal Release zip + its
+      # `.sha`, each ordered Delta release zip + its `.sha`, then the terminal
+      # release's `dbhashes.txt` -- the one per-Release text object the turnkey
+      # path needs besides the archives. There is no top-level `signatures.txt`
+      # on NIST (probes 403; the release README lists the objects): each zip
+      # already carries its inner `signatures.txt`, which the signature layer
+      # verifies from the extracted tree, so none is fetched. No URL is
+      # hard-coded; each is derived from the `Release` / `Delta release`
+      # identifiers.
     dest = Path(dest_dir)
     plan = []
     rzip = release_zip_name(release, family)
@@ -150,45 +177,62 @@ def fetch_plan(release, deltas, dest_dir, base=_NIST_BASE,
         plan.append(("delta_sidecar", delta_release,
                      object_url(base, delta_release, dzip + ".sha"),
                      dest / (dzip + ".sha")))
-    plan.append(("dbhashes", None,
-                 object_url(base, release, "dbhashes.txt"),
+    terminal = terminal_release(release, deltas)
+    plan.append(("dbhashes", terminal,
+                 object_url(base, terminal, "dbhashes.txt"),
                  dest / "dbhashes.txt"))
-    plan.append(("signatures", None,
-                 object_url(base, release, "signatures.txt"),
-                 dest / "signatures.txt"))
     return plan
 
 
 def _download(opener, url, dest):
-     # Persist one NIST object; a failed or missing object refuses loudly.
+    # Persist one NIST object, streaming it to disk in 1 MiB chunks: the
+    # full Release archive is ~18 GiB, so it is never held whole in process
+    # memory. A failed or missing object refuses loudly and leaves no
+    # partial file behind. An object already on disk in full is a resume:
+    # trusted as fetched. Archives re-verify through the integrity layers
+    # (a corrupt or pre-placed archive fails layer 1/2, ADR-0005), so a
+    # re-run never re-copies the multi-gigabyte archive (ADR-0007). The
+    # small text objects (`dbhashes.txt`) have no signature layer of their
+    # own: for them the resume extends the fetch-time trust (TLS to NIST) to
+    # the local copy -- the documented residual risk from ADR-0007, bounded
+    # by the per-Release filename.
+    if os.path.exists(dest) and os.path.getsize(dest) > 0:
+        return Path(dest)
     try:
         with opener(url) as handle:
-            content = handle.read()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest, "wb") as out:
+                while chunk := handle.read(1 << 20):
+                    out.write(chunk)
     except urllib.error.URLError as error:
+        if os.path.exists(dest):
+            os.unlink(dest)
         raise FetchError(
-             "cannot fetch " + url + ": " + str(getattr(
-                 error, "reason", error))) from error
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(content)
+              "cannot fetch " + url + ": " + str(getattr(
+                  error, "reason", error))) from error
     return dest
 
 
 def fetch_set(release, deltas, dest_dir, *,
               base=_NIST_BASE, family=_DEFAULT_FAMILY,
               opener=urllib.request.urlopen):
-      # Fetch the full Release + ordered Deltas + per-Release manifests.
-      #
-      # Each required object -- the full-Minimal **Release** zip + its `.sha`
-      # sidecar, every ordered **Delta release** zip + its sidecar, and the
-      # per-Release `dbhashes.txt` / `signatures.txt` -- is probed by exact
-      # name on NIST's per-Release path and written under `dest_dir`. A failed
-      # or missing object surfaces as a `FetchError` (never a silent empty
-      # fetch). The heavy multi-gigabyte download is the operator's step and
-      # is never a build or CI step (ADR-0003); it is injected via `opener` so
-      # the wiring is assertable without the download. No new dependency:
-      # stdlib `urllib`.
+       # Fetch the full Release + ordered Deltas + the terminal release's
+       # `dbhashes.txt`.
+       #
+       # Each required object -- the full-Minimal **Release** zip + its `.sha`
+       # sidecar, every ordered **Delta release** zip + its sidecar, and the
+       # terminal release's `dbhashes.txt` -- is probed by exact name on
+       # NIST's per-Release path and written under `dest_dir`, streamed in
+       # chunks rather than whole into memory. There is no top-level
+       # `signatures.txt` on NIST to fetch: each archive carries its inner
+       # copy, which the signature layer reads from the extracted tree. A
+       # failed or missing object surfaces as a `FetchError` (never a silent
+       # empty fetch). The heavy multi-gigabyte download is the operator's
+       # step and is never a build or CI step (ADR-0003); it is injected via
+       # `opener` so the wiring is assertable without the download. No new
+       # dependency: stdlib `urllib`.
     fetched = FetchedSet(
-         None, None, None, None,
+         None, None, None,
          [FetchedDelta(delta, None, None) for delta in deltas])
     for role, marker, url, target in fetch_plan(
          release, deltas, dest_dir, base=base, family=family):
@@ -206,8 +250,6 @@ def fetch_set(release, deltas, dest_dir, *,
             slot.sidecar = _download(opener, url, target)
         elif role == "dbhashes":
             fetched.dbhashes = _download(opener, url, target)
-        elif role == "signatures":
-            fetched.signatures = _download(opener, url, target)
     return fetched
 
 
