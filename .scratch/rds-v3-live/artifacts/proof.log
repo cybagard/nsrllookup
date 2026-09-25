@@ -1,0 +1,81 @@
+pre-flight: base=169.3 GiB  index_budget=74 GiB  slack=27 GiB
+pre-flight: need=271.8 GiB  volume_free=605.5 GiB
+pre-flight: OK
+[19:11:56] monitor: peak_alloc=0.0 GiB free=605.5 GiB
+[19:16:56] monitor: peak_alloc=121.1 GiB free=605.5 GiB
+[19:21:57] monitor: peak_alloc=169.4 GiB free=605.5 GiB
+[19:26:57] monitor: peak_alloc=173.1 GiB free=605.5 GiB
+[19:31:58] monitor: peak_alloc=186.4 GiB free=605.5 GiB
+[19:36:58] monitor: peak_alloc=195.7 GiB free=605.5 GiB
+[19:41:59] monitor: peak_alloc=206.8 GiB free=605.5 GiB
+[19:47:01] monitor: peak_alloc=220.3 GiB free=605.5 GiB
+[19:52:22] monitor: peak_alloc=237.7 GiB free=605.5 GiB
+[19:58:28] monitor: peak_alloc=238.4 GiB free=605.5 GiB
+[20:04:17] monitor: peak_alloc=239.0 GiB free=605.5 GiB
+[20:10:01] monitor: peak_alloc=239.6 GiB free=605.5 GiB
+[20:16:09] monitor: peak_alloc=240.1 GiB free=605.5 GiB
+[20:22:09] monitor: peak_alloc=240.7 GiB free=605.5 GiB
+[20:28:03] monitor: peak_alloc=241.2 GiB free=605.5 GiB
+[20:34:07] monitor: peak_alloc=241.8 GiB free=605.5 GiB
+[20:40:03] monitor: peak_alloc=242.3 GiB free=605.5 GiB
+[20:45:59] monitor: peak_alloc=242.7 GiB free=605.5 GiB
+[20:51:54] monitor: peak_alloc=243.2 GiB free=605.5 GiB
+[20:57:47] monitor: peak_alloc=243.6 GiB free=605.5 GiB
+[21:03:47] monitor: peak_alloc=244.0 GiB free=605.5 GiB
+[21:09:45] monitor: peak_alloc=244.4 GiB free=605.5 GiB
+[21:15:40] monitor: peak_alloc=244.8 GiB free=605.5 GiB
+[21:21:38] monitor: peak_alloc=245.2 GiB free=605.5 GiB
+[21:27:28] monitor: peak_alloc=245.6 GiB free=605.5 GiB
+[21:33:23] monitor: peak_alloc=245.9 GiB free=605.5 GiB
+[21:39:15] monitor: peak_alloc=246.3 GiB free=605.5 GiB
+[21:45:04] monitor: peak_alloc=246.6 GiB free=605.5 GiB
+[21:50:52] monitor: peak_alloc=247.0 GiB free=605.5 GiB
+[21:56:52] monitor: peak_alloc=247.3 GiB free=605.5 GiB
+[22:02:49] monitor: peak_alloc=247.7 GiB free=605.5 GiB
+[22:08:38] monitor: peak_alloc=248.0 GiB free=605.5 GiB
+[22:14:12] monitor: peak_alloc=248.3 GiB free=605.5 GiB
+[22:19:46] monitor: peak_alloc=248.5 GiB free=605.5 GiB
+[22:25:23] monitor: peak_alloc=248.9 GiB free=605.5 GiB
+[22:31:15] monitor: peak_alloc=249.2 GiB free=605.5 GiB
+[22:37:04] monitor: peak_alloc=249.4 GiB free=605.5 GiB
+[22:42:52] monitor: peak_alloc=249.5 GiB free=605.5 GiB
+[22:48:47] monitor: peak_alloc=249.7 GiB free=605.5 GiB
+[22:54:35] monitor: peak_alloc=249.9 GiB free=605.5 GiB
+[23:00:22] monitor: peak_alloc=250.1 GiB free=605.5 GiB
+[23:06:04] monitor: peak_alloc=250.3 GiB free=605.5 GiB
+[23:11:47] monitor: peak_alloc=250.5 GiB free=605.5 GiB
+[23:17:33] monitor: peak_alloc=250.6 GiB free=605.5 GiB
+[23:23:22] monitor: peak_alloc=250.8 GiB free=605.5 GiB
+[23:29:08] monitor: peak_alloc=251.0 GiB free=605.5 GiB
+[23:35:08] monitor: peak_alloc=251.1 GiB free=605.5 GiB
+[23:40:52] monitor: peak_alloc=251.3 GiB free=605.5 GiB
+[23:46:31] monitor: peak_alloc=251.4 GiB free=605.5 GiB
+[23:52:20] monitor: peak_alloc=251.6 GiB free=605.5 GiB
+[23:58:10] monitor: peak_alloc=251.8 GiB free=605.5 GiB
+[00:04:05] monitor: peak_alloc=251.9 GiB free=605.5 GiB
+[00:09:53] monitor: peak_alloc=252.1 GiB free=605.5 GiB
+[00:15:34] monitor: peak_alloc=252.3 GiB free=605.5 GiB
+[00:21:17] monitor: peak_alloc=252.4 GiB free=605.5 GiB
+[00:26:56] monitor: peak_alloc=252.6 GiB free=605.5 GiB
+PASS turnkey run completed (fetch+verify+apply+record+write)  -- 315.3 min
+PASS final volume fully materialised (zero tail verified)  -- size=252.6 GiB allocated=252.6 GiB
+PASS manifest records NIST's REAL published dbhash (not a stand-in)  -- recorded 481e5f55f6d1ed63ea0f176779efc5cc5d53e52a
+PASS manifest recipe: base + ordered deltas  -- 2026.03.1 + ['2026.06.1', '2026.09.1']
+PASS delta apply: 2026.09.1-inserted digest is KNOWN in the final Set
+PASS the absent digest is UNKNOWN (lookup still discriminates)
+PASS KNOWN digest is a 2026.09.1 insertion (in that delta, not 2026.06.1's)
+PASS make verify: the provisioned volume is READY  -- {'manifest': 'present', 'well_formed': True, 'hash_set': 'present', 'ready': True}
+PASS /health reports ready  -- dataset={'dbhash': '481e5f55f6d1ed63ea0f176779efc5cc5d53e52a', 'deltas': ['2026.06.1', '2026.09.1'], 'release': '2026.03.1', 'set': 'modern'}
+PASS /check: KNOWN answer + dbhash in its dataset block  -- dbhash=481e5f55f6d1ed63ea0f176779efc5cc5d53e52a
+PASS /check: UNKNOWN answer + same real token  -- dataset={'dbhash': '481e5f55f6d1ed63ea0f176779efc5cc5d53e52a', 'deltas': ['2026.06.1', '2026.09.1'], 'release': '2026.03.1', 'set': 'modern'}
+=== measured footprint ===
+run time:       315.3 min
+peak allocated: 252.6 GiB (monitored)
+min free:       605.5 GiB (monitored)
+final volume:   size=252.6 GiB allocated=252.6 GiB
+peak RSS:       125.9765625 MiB
+PASS disk peak bounded: archive + one database, never a third  -- peak=252.6 GiB (final=252.6 GiB)
+removing the 237 GiB proof volume to return the space (re-run proves it again; `--keep` retains it)
+cleaned: proof volume + scratch removed; NIST zips retained in raw/
+=== REAL-DATA TURNKEY PROOF (UNCAPPED): ALL PASS ===
+final volume: /workspace/.scratch/rds-v3-live/artifacts/proof_data/rds.db

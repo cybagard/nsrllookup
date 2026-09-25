@@ -20,6 +20,7 @@ from hasheset import build_delta_sql
 from hasheset import build_minimal_fixture_db
 from hasheset import verify_readiness
 
+from provision import _download
 from provision import FetchError
 from provision import fetch_plan
 from provision import fetch_set
@@ -412,3 +413,37 @@ def test_fetch_writes_only_when_object_present(tmp_path):
     except FetchError:
         pass
     assert not (dest / "RDS_2026.09.1_modern_minimal.zip").exists()
+
+
+def test_download_skips_a_complete_object(tmp_path):
+     # Resume (ADR-0007): an object already on disk in full is trusted and the
+    # opener is never called for it, so a re-run never re-copies the archive.
+    dest = tmp_path / "RDS_x.zip"
+    dest.write_bytes(b"pre-fetched")
+    def opener(url):
+        raise AssertionError(url + " must not be refetched")
+    assert _download(opener, "https://x", dest) == dest
+    assert dest.read_bytes() == b"pre-fetched"
+
+
+def test_download_refetches_when_object_missing(tmp_path):
+     # A missing object still streams in through the opener.
+    dest = tmp_path / "RDS_x.zip"
+    opened = []
+    def opener(url):
+        opened.append(url)
+        return io.BytesIO(b"body")
+    assert _download(opener, "https://x", dest) == dest
+    assert dest.read_bytes() == b"body"
+    assert opened == ["https://x"]
+
+
+def test_download_refetches_a_zero_byte_object(tmp_path):
+     # A zero-byte target is not a complete object and is refetched.
+    dest = tmp_path / "RDS_x.zip"
+    dest.write_bytes(b"")
+    def opener(url):
+        assert url == "https://x"
+        return io.BytesIO(b"body")
+    assert _download(opener, "https://x", dest) == dest
+    assert dest.read_bytes() == b"body"

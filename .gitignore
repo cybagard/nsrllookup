@@ -71,6 +71,9 @@ cover/
 
 # Django stuff:
 *.log
+# The real-data proof transcript is a run record, not a runtime log:
+# keep it out of the ignore rule so it can be committed with ticket 04.
+!.scratch/rds-v3-live/artifacts/proof.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

@@ -15,12 +15,16 @@ import io
 import tempfile
 import urllib.error
 import zipfile
+from pathlib import Path
 
 import hasheset
 from hasheset import build_delta_sql
 from hasheset import build_minimal_fixture_db
 from hasheset import verify_readiness
 
+from driver import _extract
+from driver import _find
+from driver import _move_or_copy
 from driver import _remove_if_scratch
 from driver import apply_delta_releases
 from driver import IntegrityError
@@ -275,6 +279,141 @@ def test_scratch_unlink_never_touches_paths_outside_roots(tmp_path):
     assert not inside.exists()
     _remove_if_scratch(outside, (work,))
     assert outside.exists()
+
+
+def test_scratch_unlink_tolerates_a_missing_path(tmp_path):
+    # A path already gone (renamed to its final place) is a no-op, not an
+    # error (ADR-0007): hygiene must not raise on a superseded rename.
+    work = tmp_path / "work"
+    work.mkdir()
+    _remove_if_scratch(work / "gone.db", (work,))
+
+
+def test_find_skips_metadata_twins(tmp_path):
+    # A `._<name>` AppleDouble twin also *ends with* the base name; it must
+    # never be served where the real file is expected (ADR-0007 run 1 died
+    # applying one as if it were the delta script).
+    inner = tmp_path / "tree"
+    inner.mkdir()
+    real = inner / "RDS_x_modern_minimal_delta.sql"
+    real.write_bytes(b"BEGIN TRANSACTION;\nCOMMIT;\n")
+    (inner / "._RDS_x_modern_minimal_delta.sql").write_bytes(
+        b"\x00\x05\x16\x07._Icon")
+    assert _find(inner, "RDS_x_modern_minimal_delta.sql") == real
+    (inner / "RDS_y.db").write_bytes(b"real db")
+    (inner / "._RDS_y.db").write_bytes(b"twin")
+    assert _find(inner, ".db") == inner / "RDS_y.db"
+
+
+def test_extract_rebuilds_a_stale_tree(tmp_path):
+    # Extracts land in a long-lived scratch dir: files left by a previous,
+    # crashed run must not survive into the new tree.
+    dest = tmp_path / "extracted" / "RDS_x_modern_minimal"
+    dest.mkdir(parents=True)
+    (dest / "stale_from_crashed_run.sql").write_bytes(b"junk")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("RDS_x_modern_minimal/readme.txt", b"hello")
+    zip_path = tmp_path / "RDS_x_modern_minimal.zip"
+    zip_path.write_bytes(buffer.getvalue())
+    tree = _extract(zip_path, dest)
+    assert not (tree / "stale_from_crashed_run.sql").exists()
+    assert (tree / "RDS_x_modern_minimal" / "readme.txt").read_bytes(
+    ) == b"hello"
+
+
+def test_move_or_copy_renames_on_one_volume(tmp_path):
+    # Same volume: O(1) rename, source gone, content intact (ADR-0007).
+    src = tmp_path / "in" / "base.db"
+    src.parent.mkdir()
+    src.write_bytes(b"payload")
+    out = tmp_path / "data" / "rds.db"
+    out.parent.mkdir()
+    _move_or_copy(src, out)
+    assert not src.exists()
+    assert out.read_bytes() == b"payload"
+
+
+def test_move_or_copy_copies_across_volumes(tmp_path, monkeypatch):
+    # Across volumes: streamed copy; the scratch source stays for hygiene.
+    src = tmp_path / "in" / "base.db"
+    src.parent.mkdir()
+    src.write_bytes(b"payload")
+    out = tmp_path / "data" / "rds.db"
+    out.parent.mkdir()
+    import os
+    from types import SimpleNamespace
+    real_stat = os.stat
+    def fake_stat(path, *, dir_fd=None, follow_symlinks=True):
+        # Only the two directory parents are cross-volume in this fake;
+        # everything else stats for real via the captured function.
+        name = Path(path).name
+        if name in ("in", "data"):
+            return SimpleNamespace(
+                st_dev=1 if name == "in" else 2)
+        return real_stat(
+            path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+    monkeypatch.setattr("driver.os.stat", fake_stat)
+    _move_or_copy(src, out)
+    assert out.read_bytes() == b"payload"
+    assert src.read_bytes() == b"payload"
+
+
+def test_turnkey_applies_deltas_in_place_without_tmp_copies(tmp_path,
+                                                             monkeypatch):
+    # The run's working copy is scratch, so Deltas apply in place and the
+    # finished database is renamed into the data dir: no second, third, or
+    # fourth full database ever exists (ADR-0007).
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    tmp_root = tmp_path / "scratch_tmp"
+    tmp_root.mkdir()
+    real_mkstemp = tempfile.mkstemp
+    calls = []
+
+    def fake_mkstemp(suffix=".db"):
+        calls.append(suffix)
+        return real_mkstemp(suffix=suffix, dir=str(tmp_root))
+
+    monkeypatch.setattr(
+        "hasheset.tempfile.mkstemp", fake_mkstemp)
+    _provision(tmp_path, [_DELTA_1, _DELTA_2], store=store)
+    assert calls == []
+    assert list(tmp_root.glob("*.db")) == []
+    assert not (tmp_path / "work" / "base.db").exists()
+    assert (tmp_path / "data" / "rds.db").exists()
+    # Both deltas' rows ride on the renamed volume.
+    result = verify_release(str(tmp_path / "data"))
+    assert result.ready is True
+
+
+def test_apply_copies_when_base_outside_scratch(tmp_path, monkeypatch):
+    # A database outside the scratch roots -- a trusted mounted volume -- is
+    # protected by copy-on-apply: the source is untouched, the copy lands in
+    # system scratch (ADR-0005/ADR-0007).
+    store, _row_d1, _row_d2 = _store(tmp_path)
+    _provision(tmp_path, [_DELTA_1], store=store)
+    set_obj = hasheset.provision(
+        str(tmp_path / "data" / "rds.db"),
+        hasheset.Provenance("modern", _RELEASE, [_DELTA_1], _DBHASH))
+    tmp_root = tmp_path / "scratch_tmp"
+    tmp_root.mkdir()
+    real_mkstemp = tempfile.mkstemp
+
+    def fake_mkstemp(suffix=".db"):
+        return real_mkstemp(suffix=suffix, dir=str(tmp_root))
+
+    monkeypatch.setattr(
+        "hasheset.tempfile.mkstemp", fake_mkstemp)
+    row = _row("CCCC5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C", "delta3.bin")
+    redone = apply_delta_releases(
+        set_obj, [(_DELTA_2, build_delta_sql([row]))],
+        scratch_dirs=(tmp_path / "work",))
+    assert len(list(tmp_root.glob("*.db"))) == 1
+    assert redone.is_known(
+        "md5", "CCCC5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C")
+    # The volume never absorbed the delta.
+    assert not set_obj.is_known(
+        "md5", "CCCC5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C")
 
 
 def test_hygiene_removes_tmp_intermediates(tmp_path, monkeypatch):

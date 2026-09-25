@@ -74,17 +74,34 @@ def delta_sql_name(delta_release, family=_DEFAULT_FAMILY):
 
 
 def _find(inner_dir, suffix):
-    """Walk an extracted archive tree, returning the first file by suffix."""
+    """Walk an extracted archive tree, returning the first file by name.
+
+    `suffix` is a full file name, or a short suffix such as `.db`. A match
+    may never be a metadata twin: macOS Finder/AppleDouble files carry a
+    `._<name>` twin whose name also *ends with* the base name, and a stale
+    `._RDS_..._delta.sql` in the tree would otherwise be served to the delta
+    apply as the script (a 45-byte metadata blob, not SQL). Dot- and
+    underscore-prefixed names are never NIST data files, so they never match.
+    """
     for root, _, files in os.walk(inner_dir):
-        for name in files:
-            if name.endswith(suffix):
+        for name in sorted(files):
+            if name.startswith((".", "_")):
+                continue
+            if name == suffix or name.endswith(suffix):
                 return Path(root) / name
     return None
 
 
 def _extract(archive, dest_dir):
-    """Unzip an NIST archive, flat over its top folder so inner files match."""
+    """Unzip an NIST archive, flat over its top folder so inner files match.
+
+    The destination tree is rebuilt from scratch: the run's extracts land in
+    a long-lived scratch directory that a previous, crashed run may have left
+    stale files in, and a stale file must never survive into this run's tree.
+    """
     dest = Path(dest_dir)
+    if dest.exists():
+        shutil.rmtree(dest, ignore_errors=True)
     dest.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive) as zip_file:
         for name in zip_file.namelist():
@@ -153,14 +170,36 @@ def _remove_if_scratch(path, scratch_dirs):
 
     The turnkey run's intermediates -- the per-apply copy-on-apply database
     and the base's working copy -- are deleted as they are superseded, so the
-    run leaves no multi-hundred-GiB scratch trail (ADR-0003). The unlink is
+    run leaves no multi-hundred-GiB scratch trail (ADR-0007). The unlink is
     resolved and scoped: anything outside the given roots (a mounted volume,
-    the data dir) is never touched (ADR-0005).
+    the data dir) is never touched (ADR-0005). A path already gone (superseded
+    by a same-volume rename rather than a copy) is a no-op, not an error.
     """
     for root in scratch_dirs:
         if _inside_resolved(path, root):
-            Path(path).unlink()
+            Path(path).unlink(missing_ok=True)
             return
+
+
+def _in_scratch(path, scratch_dirs):
+    """True iff `path` resolves inside one of the run's scratch roots."""
+    return any(_inside_resolved(path, root) for root in scratch_dirs)
+
+
+def _move_or_copy(src, dst):
+    """Bring a scratch artifact into its final place with bounded disk.
+
+    Same volume: `os.replace` -- an O(1) rename that doubles nothing.
+    Cross-volume: a streamed `shutil.copyfile` (the scratch source stays in
+    place for the caller's hygiene to remove). Keeping the peak at one copy of
+    the database is what lets the turnkey run fit a small machine (ADR-0007).
+    """
+    src, dst = Path(src), Path(dst)
+    if src.parent.exists() and dst.parent.exists() \
+            and os.stat(src.parent).st_dev == os.stat(dst.parent).st_dev:
+        os.replace(src, dst)
+    else:
+        shutil.copyfile(src, dst)
 
 
 def _scratch_dirs(work_dir):
@@ -176,20 +215,27 @@ def _scratch_dirs(work_dir):
 def apply_delta_releases(base, ordered, scratch_dirs=()):
     """Apply the ordered **Delta releases** onto the base Set, in order.
 
-     Each Delta is a NIST-ordered ``.sql`` script, applied by copy-on-apply + a
-    streaming ``execute`` (ticket 04), refreshing the per-Algorithm
-    **hash index** and provenance. A Delta is streamed from its on-disk path,
-    never whole; one already in the base's provenance is a no-op for the ordered
-    list (``apply_delta`` dedupes), so a re-run never duplicates it.
-    Scratch hygiene: when `scratch_dirs` is given, each superseded database is
+     Each Delta is a NIST-ordered ``.sql`` script, applied by a streaming
+    ``execute`` (ticket 04), refreshing the per-Algorithm **hash index** and
+    provenance. A Delta is streamed from its on-disk path, never whole; one
+    already in the base's provenance is a no-op for the ordered list
+    (``apply_delta`` dedupes), so a re-run never duplicates it.
+    Where the apply lands is bounded (ADR-0007): when the current database
+    sits inside `scratch_dirs` (the run's own working copy) the Delta is
+    applied **in place** -- no second full copy of the database; a database
+    outside the scratch roots (a trusted mounted volume) is protected by the
+    default **copy-on-apply**. Scratch hygiene: each superseded database is
     removed after its successor is produced, iff it resolves inside one of the
     roots (ADR-0003/ADR-0005).
      """
     current = base
     for release_name, delta_sql in ordered:
+        in_place = _in_scratch(current.path, scratch_dirs)
         superseded = current
-        current = hasheset.apply_delta(current, delta_sql, release_name)
-        _remove_if_scratch(superseded.path, scratch_dirs)
+        current = hasheset.apply_delta(
+            current, delta_sql, release_name, in_place=in_place)
+        if current.path != superseded.path:
+            _remove_if_scratch(superseded.path, scratch_dirs)
     return current
 
 
@@ -207,18 +253,20 @@ def provision_release(release, deltas, *,
     manifest record.
 
     The multi-gigabyte **Release** fetch is the operator's step (ADR-0003);
-    ``opener`` is injected so the wiring is assertable without it. Any
+    ``opener`` is injected so the wiring is assertable without it (an object
+    already on disk in full resumes, never re-downloaded). Any
     integrity-layer failure raises before the manifest write, so an unverified
     or partially-applied **Hash Set** is never produced (ADR-0005). The final
     **``dbhash``** is NIST's published value, recorded (attested), not
     recomputed (ADR-0006).
 
-    Scratch hygiene keeps the run from peaking at triple the final volume:
-    the base's extracted tree is removed once its database has been copied to
-    the work dir, each superseded copy-on-apply database is removed once its
-    successor exists, and the final applied database is removed once copied
-    into the data dir -- in every case only when the path resolves inside the
-    run's work dir or the system temp dir, never the data volume (ADR-0005).
+    The run's disk peak is bounded at roughly one full database plus the
+    archive (ADR-0007): the base's extracted database is brought into the work
+    dir by same-volume rename, each Delta is applied in place on that working
+    copy, and the finished database is published into the data dir by rename
+    when it shares a volume (the usual case) or streamed copy only across
+    volumes. Nothing is ever doubled in full, so a machine that can hold the
+    archive + the indexed database can run the whole turnkey path.
     """
     base_url = base if base is not None else _NIST_BASE
     work = Path(work_dir)
@@ -241,7 +289,9 @@ def provision_release(release, deltas, *,
     if base_db is None:
         raise IntegrityError("release zip has no base .db for " + release)
     base_path = work / "base.db"
-    shutil.copyfile(base_db, base_path)
+    # Same volume (extracted/ lives under work): an O(1) rename, so the base
+    # is never a second full copy (ADR-0007).
+    _move_or_copy(base_db, base_path)
     shutil.rmtree(base_db.parent, ignore_errors=True)
     base_set = hasheset.provision(base_path, Provenance(set_name, release))
 
@@ -257,7 +307,10 @@ def provision_release(release, deltas, *,
     applied = apply_delta_releases(base_set, ordered, scratch)
 
     target = data / _DB_NAME
-    shutil.copyfile(applied.path, target)
+    # Same volume (the common layout: ./data beside the work dir): an O(1)
+    # rename, so the volume is never a third full copy (ADR-0007); across
+    # volumes it is a streamed copy and the scratch source is removed.
+    _move_or_copy(applied.path, target)
     _remove_if_scratch(applied.path, scratch)
     record = provision.write_manifest(
         data / MANIFEST_NAME, set_name, release,

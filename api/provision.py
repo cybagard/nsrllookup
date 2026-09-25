@@ -185,10 +185,19 @@ def fetch_plan(release, deltas, dest_dir, base=_NIST_BASE,
 
 
 def _download(opener, url, dest):
-     # Persist one NIST object, streaming it to disk in 1 MiB chunks: the
-     # full Release archive is ~18 GiB, so it is never held whole in process
-     # memory. A failed or missing object refuses loudly and leaves no
-     # partial file behind.
+    # Persist one NIST object, streaming it to disk in 1 MiB chunks: the
+    # full Release archive is ~18 GiB, so it is never held whole in process
+    # memory. A failed or missing object refuses loudly and leaves no
+    # partial file behind. An object already on disk in full is a resume:
+    # trusted as fetched. Archives re-verify through the integrity layers
+    # (a corrupt or pre-placed archive fails layer 1/2, ADR-0005), so a
+    # re-run never re-copies the multi-gigabyte archive (ADR-0007). The
+    # small text objects (`dbhashes.txt`) have no signature layer of their
+    # own: for them the resume extends the fetch-time trust (TLS to NIST) to
+    # the local copy -- the documented residual risk from ADR-0007, bounded
+    # by the per-Release filename.
+    if os.path.exists(dest) and os.path.getsize(dest) > 0:
+        return Path(dest)
     try:
         with opener(url) as handle:
             dest.parent.mkdir(parents=True, exist_ok=True)
