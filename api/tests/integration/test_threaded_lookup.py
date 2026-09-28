@@ -4,10 +4,10 @@ waitress **worker thread**.
 
 The rest of the suite serves through the single-threaded Flask test client,
 which can never produce the deployed shape -- so no test there could ever
-see a connection that refuses to answer off its boot thread. These drive the
-public ``look_up`` interface exactly as the deployment does (opened at boot
-on one thread, consulted from another, and from several at once) and assert
-one **Lookup Result** per Digest with the right
+see a connection that refuses to answer off its boot thread. These open the
+fixture **Hash Set** on this test's own thread (as boot does) and answer
+Lookups from real worker threads -- one at a time, then several at once --
+and assert one **Lookup Result** per Digest with the right
 **Known/Unknown/Invalid** **status** and the full **provenance** the
 answering dataset carries. The connection's own mechanics (how it crosses
 threads) are not the object of assertion.
@@ -30,7 +30,7 @@ MALFORMED = "not-a-digest"
 @pytest.fixture
 def hash_set(tmp_path):
     # The mount as the Provisioner left it: provisioned in-band, then the
-    # service opens it -- here on the main thread, as boot does.
+    # service opens it -- on this thread, the way boot does.
     path = str(tmp_path / "fixtureset.db")
     build_minimal_fixture_db(path, [
           {"crc32": "2E19F1E7", "md5": KNOWN_MD5,
@@ -41,25 +41,31 @@ def hash_set(tmp_path):
                                       "481e5f55f6d1ed63ea0f176779efc5cc5d53e52a"))
 
 
-def _run_session(hash_set, digests, algorithm, out, errors):
-    # One Lookup Session on a worker thread; results/errors land in the lists.
+def _session_on_worker(hash_set, digests, algorithm, out, errors):
+    # One Lookup Session on a worker thread; its results land in ``out``.
     try:
-        out.append((algorithm, look_up(hash_set, digests, algorithm)))
+        out.extend(look_up(hash_set, digests, algorithm))
     except Exception as exc:  # noqa: BLE001 -- the session must not die
         errors.append(repr(exc))
 
 
 def test_lookup_serves_from_a_worker_thread(hash_set):
     out, errors = [], []
-    _run_session(hash_set, [KNOWN_MD5, UNKNOWN_MD5, MALFORMED], "md5",
-                 out, errors)
+
+    def session():
+        # The deployed shape: booted on one thread, answered on another.
+        _session_on_worker(hash_set, [KNOWN_MD5, UNKNOWN_MD5, MALFORMED],
+                           "md5", out, errors)
+
+    worker = threading.Thread(target=session)
+    worker.start()
+    worker.join()
     assert errors == []
-    _algorithm, results = out[0]
-    by_digest = {r["digest"]: r for r in results}
+    by_digest = {r["digest"]: r for r in out}
     assert by_digest[KNOWN_MD5]["status"] == "known"
     assert by_digest[UNKNOWN_MD5]["status"] == "unknown"
     assert by_digest[MALFORMED.upper()]["status"] == "invalid"
-    for result in results:
+    for result in out:
         assert result["dataset"] == {
               "set": "modern",
               "release": "2026.03.1",
@@ -79,8 +85,8 @@ def test_concurrent_lookup_sessions_are_all_correct(hash_set):
     def session():
         barrier.wait()
         for _ in range(rounds):
-            _run_session(hash_set, [KNOWN_MD5, UNKNOWN_MD5], "md5",
-                         out, errors)
+            _session_on_worker(hash_set, [KNOWN_MD5, UNKNOWN_MD5],
+                               "md5", out, errors)
 
     threads = [threading.Thread(target=session) for _ in range(workers)]
     for thread in threads:
@@ -89,8 +95,7 @@ def test_concurrent_lookup_sessions_are_all_correct(hash_set):
         thread.join()
 
     assert errors == []
-    assert len(out) == workers * rounds
-    for _algorithm, results in out:
-        by_digest = {r["digest"]: r for r in results}
-        assert by_digest[KNOWN_MD5]["status"] == "known"
-        assert by_digest[UNKNOWN_MD5]["status"] == "unknown"
+    assert len(out) == workers * rounds * 2
+    for result in out:
+        assert result["status"] == (
+              "known" if result["digest"] == KNOWN_MD5 else "unknown")

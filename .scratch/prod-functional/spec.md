@@ -263,7 +263,8 @@ From the user's perspective:
    guarantee that *the applied database equals what NIST published* rests on **layers 1–2
    (transport SHA-1 + inner SHA-256) plus trusting NIST's published `dbhashes.txt`**; the
    boot **readiness gate** confirms the **Provisioning manifest** is present and well-formed
-   (ticket 06 in this spec closes a serving-thread gap found in the post-04 live smoke).
+   and that the mount carries the recorded token. This is the honest position under ADR-0006
+   and is stated explicitly in the implementation decisions.
 - **The waitress thread gap (ticket 06).** A live run of the provisioned service
    (post ticket-04 smoke) found every `POST /check` returning 500: the Hash Set's
    single read-only connection is opened on the boot thread, and CPython's `sqlite3`
@@ -272,8 +273,6 @@ From the user's perspective:
    single-threaded Flask test client. Closed in ticket 06: the connection crosses
    threads (`check_same_thread=False`) with an application-held lock around the
    indexed query; no seam, ADR, or lookup contract changed.
-   and that the mount carries the recorded token. This is the honest position under ADR-0006
-   and is stated explicitly in the implementation decisions.
 - **Stale tracker.** The `.scratch/triage/issues/*` `Status: open` lines predate the
    `rds-v3-live` commits (01–09, see `git log`); they should be resynced to `resolved` so
    the tracker reflects reality.

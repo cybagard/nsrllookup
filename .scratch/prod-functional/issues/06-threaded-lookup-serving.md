@@ -60,3 +60,8 @@ running the provisioned service live after ticket 04).
   from this change). Live smoke: `python /api/app.py` against a provisioned
   volume → `/health` ready, `POST /check` HTTP 200 with
   known/unknown/invalid results + full provenance, Audit Entry recorded.
+- 2026-09-28 (code review): two-axis review of the landing diff found the
+  worker-thread test was actually running the session on the test's own thread
+  (so it could never be the red) and the spec note was spliced mid-sentence.
+  Both fixed: the worker test now answers from a real worker thread (verified
+  red pre-fix), and the spec note is a standalone item. Second commit.
