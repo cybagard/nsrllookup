@@ -16,3 +16,12 @@ services:
     command: python /api/app.py
     ports:
       - 5000:5000
+  api-test:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: nsrllookup-api
+    volumes:
+      - ./data:/data:ro
+      - ./data/audit:/var/log/nsrllookup
+    command: pytest --cov=. --cov-report=term-missing

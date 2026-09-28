@@ -3,7 +3,7 @@ FROM python:3.14-slim
 WORKDIR /workspace
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc curl \
+ && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*
 
 COPY api/requirements.txt /tmp/requirements.txt

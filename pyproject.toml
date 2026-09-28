@@ -1,0 +1,7 @@
+[tool.pylint.main]
+jobs = 0
+
+[tool.pylint."messages control"]
+disable = [
+    "import-error",
+]
