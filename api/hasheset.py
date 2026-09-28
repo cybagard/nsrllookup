@@ -23,6 +23,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import threading
 from typing import Any
 from typing import Dict
 from typing import Sequence
@@ -183,14 +184,21 @@ class HashSet:
     on-disk seek, holding no in-RAM digest copy -- the index lives in the
     database itself (ADR-0001), so there is no second dataset and no OOM from
     materialising the distinct-digest set. A single read-only connection is
-    shared across lookups to keep the open handles bounded.
+    shared across lookups to keep the open handles bounded. The connection
+    crosses service threads (``check_same_thread=False``) and each membership
+    query holds a lock, because CPython's ``sqlite3`` guarantees a connection
+    may move between threads but not that concurrent use of one connection is
+    safe -- and the service opens it once at boot while waitress answers
+    Lookup Sessions on worker threads.
     """
 
     def __init__(self, path: str, provenance: Provenance) -> None:
         self._path = os.fspath(path)
         self._provenance = provenance
+        self._lock = threading.Lock()
         self._conn = sqlite3.connect(
-            "file:" + self._path + "?mode=ro", uri=True)
+            "file:" + self._path + "?mode=ro", uri=True,
+            check_same_thread=False)
 
     @property
     def provenance(self) -> Provenance:
@@ -208,11 +216,12 @@ class HashSet:
         index, so any case resolves. A single-row existence test needs only the
         index, not the raw `FILE` scan, and holds no copies in RAM.
         """
-        cursor = self._conn.execute(
-            "SELECT 1 FROM " + TABLE + " WHERE "
-            + ALGORITHM_COLUMN[algorithm] + " = ? LIMIT 1",
-            (digest.upper(),))
-        return cursor.fetchone() is not None
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT 1 FROM " + TABLE + " WHERE "
+                + ALGORITHM_COLUMN[algorithm] + " = ? LIMIT 1",
+                (digest.upper(),))
+            return cursor.fetchone() is not None
 
 
 def provision(path: str, provenance: Provenance) -> HashSet:
