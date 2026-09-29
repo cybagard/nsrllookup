@@ -7,11 +7,9 @@ separating the benign, pre-existing files in a digital-evidence corpus from the
 files of interest — so a lookup is only trustworthy when it reports **which
 dataset** answered.
 
-| Service | main |
-|---------|------|
-| CI    | [![Test](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml) |
-| Image | [![Build & Scan](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml) |
-| License | [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) |
+[![Test](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml)
+[![Build & Scan](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Why
 
