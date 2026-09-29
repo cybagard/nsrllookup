@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>nsrllookup · cybagard</title>
-<meta name="description" content="A forensic lookup API that answers whether file digests are known reference data in the NIST RDS V3 Modern Set — and names exactly which dataset answered.">
+<meta name="description" content="A forensic lookup API. It compares file hashes with the NIST RDS V3 Modern Set. Each answer shows the dataset that gave it.">
 <meta name="theme-color" content="#000000">
 <meta property="og:title" content="nsrllookup">
-<meta property="og:description" content="Provenanced NIST RDS V3 hash lookups. Separate the benign from the interesting.">
+<meta property="og:description" content="Find the known files in your evidence. Examine only the unknown files.">
 <meta property="og:image" content="assets/mark-ink.png">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -112,8 +112,6 @@
   .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
   .hero-mark { position: relative; display: grid; place-items: center; }
   .hero-mark img { width: min(360px, 80%); height: auto; filter: drop-shadow(0 30px 60px rgba(197,176,129,.12)); }
-  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 34px; }
-  .badges img { height: 20px; }
   @media (max-width: 860px) {
     .hero .wrap { grid-template-columns: 1fr; padding-top: 56px; padding-bottom: 64px; }
     .hero-mark { order: -1; justify-items: start; }
@@ -146,6 +144,27 @@
   .card .num { font: 600 13px/1 var(--mono); color: var(--accent); letter-spacing: .1em; display: block; margin-bottom: 18px; }
   .card.accent-top::before {
     content: ""; position: absolute; left: 28px; top: 0; width: 40px; height: 3px; background: var(--gold);
+  }
+
+  /* ---------- triage flow ---------- */
+  .flow { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1.3fr; align-items: stretch; }
+  .flow .arrow { display: grid; place-items: center; color: var(--accent); font: 700 24px var(--mono); }
+  .flow .card h3 { margin-top: 4px; }
+  .outcomes { display: grid; gap: 14px; }
+  .outcome { border-radius: var(--radius); padding: 20px 22px; border: 1px solid var(--border); background: var(--card); }
+  .outcome p { margin: 6px 0 0; color: var(--fg-muted); font-size: 16px; }
+  .outcome.known { background: var(--bg-alt); }
+  .outcome.unknown { border: 2px solid var(--gold); }
+  .outcome .pill { margin-right: 6px; }
+  .caution {
+    margin-top: 28px; padding: 18px 22px; border-left: 4px solid var(--gold);
+    background: color-mix(in srgb, var(--gold) 12%, transparent); border-radius: 0 10px 10px 0;
+    color: var(--fg); font-size: 16px;
+  }
+  .caution b { color: var(--accent); letter-spacing: .06em; font-family: var(--mono); font-size: 13px; margin-right: 8px; }
+  @media (max-width: 900px) {
+    .flow { grid-template-columns: 1fr; }
+    .flow .arrow { height: 40px; transform: rotate(90deg); }
   }
 
   /* ---------- provenance showcase ---------- */
@@ -244,6 +263,7 @@
     </a>
     <ul>
       <li><a href="#why">Why</a></li>
+      <li><a href="#features">Features</a></li>
       <li><a href="#integrity">Integrity</a></li>
       <li><a href="#coverage">Coverage</a></li>
       <li><a href="#quickstart">Quickstart</a></li>
@@ -260,16 +280,11 @@
   <div class="wrap">
     <div>
       <span class="eyebrow">NIST RDS V3 · Modern Set</span>
-      <h1>Known files,<br><span>with provenance.</span></h1>
-      <p class="lede">A forensic lookup API that tells you which file digests are known reference data, and names exactly which dataset gave the answer.</p>
+      <h1>Find known files.<br><span>Show the source.</span></h1>
+      <p class="lede">nsrllookup is a forensic lookup API. It compares file hashes with the NIST Reference Data Set. Each answer shows the dataset that gave it.</p>
       <div class="cta">
         <a class="btn btn-gold" href="#quickstart">Get started →</a>
         <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup">View on GitHub</a>
-      </div>
-      <div class="badges">
-        <a href="https://github.com/cybagard/nsrllookup/actions/workflows/test.yml"><img src="https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg" alt="Test status"></a>
-        <a href="https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml"><img src="https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg" alt="Build and scan status"></a>
-        <a href="https://github.com/cybagard/nsrllookup/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-C5B081.svg?labelColor=000000" alt="MIT license"></a>
       </div>
     </div>
     <div class="hero-mark">
@@ -284,44 +299,78 @@
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Why nsrllookup</span>
-      <h2>Separate the benign from the interesting.</h2>
-      <p>Most files in a digital-evidence corpus are pre-existing reference data. nsrllookup marks those digests as <b>known</b> so you can set them aside, and every answer says where it came from.</p>
+      <h2>Remove the known files. Examine the remaining files.</h2>
+      <p>A seized disk can contain one million files or more. Most of these files come from operating systems and standard software. They are not evidence. nsrllookup finds these files, so that you can put your time into the files that remain.</p>
+    </div>
+    <div class="flow">
+      <div class="card accent-top">
+        <span class="num">STEP 1</span>
+        <h3>Calculate the hashes</h3>
+        <p>Use your forensic tool to calculate an MD5, SHA-1 or SHA-256 hash for each file in the evidence.</p>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="card accent-top">
+        <span class="num">STEP 2</span>
+        <h3>Send the hashes</h3>
+        <p>Send the hashes to nsrllookup. It compares each hash with the NIST list of files from published software.</p>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="outcomes">
+        <div class="outcome known">
+          <span class="pill off">known</span><b>Put the file aside.</b>
+          <p>NIST recorded this file in published software.</p>
+        </div>
+        <div class="outcome unknown">
+          <span class="pill on">unknown</span><b>Examine the file.</b>
+          <p>NIST has no record of this file. It can be user data, a custom file or malware.</p>
+        </div>
+      </div>
+    </div>
+    <p class="caution"><b>NOTE</b>A <code>known</code> result does not mean that the file is safe. It means only that NIST found the file in published software. An <code>unknown</code> result does not mean that the file is malicious.</p>
+  </div>
+</section>
+
+<section id="features" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Features</span>
+      <h2>Answers that you can check.</h2>
     </div>
     <div class="grid g4">
       <div class="card accent-top">
         <span class="num">01</span>
-        <h3>Provenanced answers</h3>
-        <p>Every result names the Set, the Release, the Delta releases applied, and the final <code>dbhash</code>. That is enough to check the answer against NIST yourself.</p>
+        <h3>Each answer shows its source</h3>
+        <p>Each result shows the Set, the Release, the Delta releases and the final <code>dbhash</code>. Use these values to check the answer with NIST.</p>
       </div>
       <div class="card accent-top">
         <span class="num">02</span>
-        <h3>Integrity in three layers</h3>
-        <p>The archive SHA-1, each inner file's SHA-256, and NIST's dbhash are all verified. If any layer fails, the Hash Set is never served.</p>
+        <h3>Three integrity checks</h3>
+        <p>The Provisioner checks the archive SHA-1, the SHA-256 of each inner file and the NIST dbhash. If one check fails, the service does not use the data.</p>
       </div>
       <div class="card accent-top">
         <span class="num">03</span>
-        <h3>Public, but accountable</h3>
-        <p>Lookups need no login. Every session, accepted or rejected, is written to an append-only Audit Trail.</p>
+        <h3>Public, with an audit record</h3>
+        <p>The API does not require a login. The service records each lookup session in an append-only Audit Trail. This includes rejected sessions.</p>
       </div>
       <div class="card accent-top">
         <span class="num">04</span>
-        <h3>No daemon, no RAM set</h3>
-        <p>One WSGI service reads a verified, read-only database. Each lookup is an indexed seek on disk.</p>
+        <h3>One service, low memory</h3>
+        <p>One WSGI service reads a verified, read-only database. Each lookup reads an index on the disk. The dataset does not stay in memory.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section class="alt">
+<section>
   <div class="wrap split">
     <div>
       <span class="eyebrow" style="color:var(--accent)">Lookup Result</span>
-      <h2>An answer you can re-verify.</h2>
-      <p style="color:var(--fg-muted);font-size:19px;margin:0">Send one Algorithm and any number of Digests. Each digest gets its own result, with the full dataset lineage attached.</p>
+      <h2>Each answer shows its source.</h2>
+      <p style="color:var(--fg-muted);font-size:19px;margin:0">Send one Algorithm and one or more Digests. The service returns one result for each digest. Each result identifies the dataset.</p>
       <ul class="checklist">
-        <li><span class="tick">✓</span><span><b>MD5, SHA-1, SHA-256.</b> Any letter case, normalised to uppercase.</span></li>
-        <li><span class="tick">✓</span><span><b>Per-item <code>invalid</code>.</b> A digest that doesn't parse never fails the whole batch.</span></li>
-        <li><span class="tick">✓</span><span><b>Readiness gate.</b> If the manifest is missing or doesn't match, the service returns <code>503</code> and answers nothing.</span></li>
+        <li><span class="tick">✓</span><span><b>MD5, SHA-1 and SHA-256.</b> Use uppercase or lowercase letters. The service changes all letters to uppercase.</span></li>
+        <li><span class="tick">✓</span><span><b>One result for each digest.</b> If a digest is not correct, its result is <code>invalid</code>. The other digests get a usual result.</span></li>
+        <li><span class="tick">✓</span><span><b>Readiness gate.</b> If the manifest is missing or does not agree with the data, the service returns <code>503</code>. It gives no answers.</span></li>
       </ul>
     </div>
     <div class="term" role="region" aria-label="Example request and response">
@@ -347,12 +396,12 @@
   </div>
 </section>
 
-<section id="integrity">
+<section id="integrity" class="alt">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Provisioning</span>
-      <h2>Three rings of trust.</h2>
-      <p>The Provisioner checks every layer and records all three values in a <b>Provisioning manifest</b>. At startup the service is <b>ready</b> only if that manifest still matches the mounted Hash Set.</p>
+      <h2>Three integrity checks.</h2>
+      <p>The Provisioner does the three checks below. It writes the three values into the <b>Provisioning manifest</b>. At startup, the service compares the manifest with the Hash Set. The service is <b>ready</b> only if they agree.</p>
     </div>
     <div class="rings-wrap">
       <div class="rings" aria-hidden="true">
@@ -366,27 +415,27 @@
       <div class="layers">
         <div class="layer">
           <div class="lvl">1</div>
-          <div><h3>Archive SHA-1</h3><p>The downloaded release archive must match NIST's published <code>.sha</code> sidecar.</p></div>
+          <div><h3>Archive SHA-1</h3><p>The Provisioner compares the SHA-1 of the Release archive with the NIST <code>.sha</code> file.</p></div>
         </div>
         <div class="layer">
           <div class="lvl">2</div>
-          <div><h3>Inner-file SHA-256</h3><p>Every file inside the archive is checked against <code>signatures.txt</code>.</p></div>
+          <div><h3>Inner-file SHA-256</h3><p>The Provisioner compares the SHA-256 of each file in the archive with <code>signatures.txt</code>.</p></div>
         </div>
         <div class="layer">
           <div class="lvl">3</div>
-          <div><h3>Final dbhash</h3><p>Once all deltas are applied, the database must match NIST's published <code>dbhashes.txt</code> for the last Release.</p></div>
+          <div><h3>Final dbhash</h3><p>The Provisioner applies all Delta releases. Then it compares the database hash with the NIST <code>dbhashes.txt</code> value for the last Release.</p></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section id="coverage" class="alt">
+<section id="coverage">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">NSRL coverage</span>
-      <h2>What it answers today.</h2>
-      <p>One of NIST's four Sets, in the compact <b>Minimal</b> form (about 18 GB, compared with about 124 GB for the full Modern set). Delta releases keep it current without downloading the base again.</p>
+      <h2>Available data.</h2>
+      <p>NIST supplies four Sets. nsrllookup uses one Set: <b>Modern</b>, in the <b>Minimal</b> form. The Minimal form is approximately 18 GB. The full Modern Set is approximately 124 GB. Delta releases update the data. You do not download the base Release again.</p>
     </div>
     <div class="grid g2">
       <div class="card table-card">
@@ -407,42 +456,42 @@
             <tr><td><b>MD5</b></td><td class="yes">Yes</td></tr>
             <tr><td><b>SHA-1</b></td><td class="yes">Yes</td></tr>
             <tr><td><b>SHA-256</b></td><td class="yes">Yes</td></tr>
-            <tr><td>CRC-32</td><td class="no">No: stored in every row, but too weak a checksum to support</td></tr>
+            <tr><td>CRC-32</td><td class="no">No. The data contains CRC-32 values, but CRC-32 is not a strong hash.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-    <p class="note"><b>Cadence:</b> NIST publishes a full Release every March and Delta releases in June, September and December. <code>/health</code> reports exactly which ones are loaded.</p>
+    <p class="note"><b>Cadence:</b> NIST publishes a full Release in March. NIST publishes Delta releases in June, September and December. <code>/health</code> shows the Release and Delta releases that the service uses.</p>
   </div>
 </section>
 
-<section id="quickstart">
+<section id="quickstart" class="alt">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Quickstart</span>
-      <h2>From zero to a verified answer.</h2>
-      <p>You can run the fixture-based test suite with no data at all. Serving real lookups needs a one-time download of about 19 GiB and roughly 260 GiB of free disk at peak.</p>
+      <h2>Get started.</h2>
+      <p>The test suite uses test data. It does not need the NIST data. For real lookups, you must download approximately 19 GiB one time. You must have approximately 260 GiB of free disk space.</p>
     </div>
     <div class="steps">
       <div class="step">
         <div>
-          <h3>Try it without any data</h3>
-          <p>Build the image and run the self-contained suite, including an end-to-end boot smoke test.</p>
+          <h3>Run the tests</h3>
+          <p>Build the image and run the test suite. The suite also starts the service one time with test data.</p>
           <div class="term"><pre>docker-compose -f docker-compose.build.yml up --build api-test</pre></div>
         </div>
       </div>
       <div class="step">
         <div>
-          <h3>Provision the Hash Set</h3>
-          <p>Fetch the Release and its Delta releases (oldest to newest), verify all three layers, build the index, and write <code>rds.db</code> and the manifest into <code>./data</code>.</p>
+          <h3>Prepare the Hash Set</h3>
+          <p>This command downloads the Release and the Delta releases. It does the three integrity checks and builds the index. It writes <code>rds.db</code> and the manifest into <code>./data</code>. Put the Delta releases in order, oldest first.</p>
           <div class="term"><pre>make provision RELEASE=2026.03.1 DELTAS=<span class="s">"2026.06.1 2026.09.1"</span>
 make verify</pre></div>
         </div>
       </div>
       <div class="step">
         <div>
-          <h3>Serve and look up</h3>
-          <p>Start the API on port 5000 against the mounted volume, check provenance, then send digests.</p>
+          <h3>Start the service</h3>
+          <p>Start the API on port 5000. Make sure that <code>/health</code> shows <code>"ready": true</code>. Then send the digests.</p>
           <div class="term"><pre>docker-compose -f docker-compose.prod.yml up -d api
 curl -s localhost:5000/health</pre></div>
         </div>
@@ -451,25 +500,25 @@ curl -s localhost:5000/health</pre></div>
   </div>
 </section>
 
-<section id="api" class="alt">
+<section id="api">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">API</span>
-      <h2>Three endpoints.</h2>
+      <h2>API endpoints.</h2>
     </div>
     <div class="grid g3">
       <div class="card">
         <div class="ep"><span class="verb post">POST</span><code>/check</code></div>
-        <p>One Algorithm with one or more Digests. Returns one Lookup Result per digest: <code>known</code>, <code>unknown</code> or <code>invalid</code>.</p>
+        <p>Send one Algorithm and one or more Digests. The service returns one result for each digest: <code>known</code>, <code>unknown</code> or <code>invalid</code>.</p>
         <div class="status-row"><span class="pill on">200</span><span class="pill off">4xx rejected</span><span class="pill off">503 not ready</span></div>
       </div>
       <div class="card">
         <div class="ep"><span class="verb">GET</span><code>/health</code></div>
-        <p>The loaded Set, Release, Delta releases and final dbhash, plus a <code>ready</code> flag. Check this before you trust any answers.</p>
+        <p>Shows the Set, the Release, the Delta releases, the final dbhash and a <code>ready</code> flag. Examine this data before you use the results.</p>
       </div>
       <div class="card">
         <div class="ep"><span class="verb">GET</span><code>/ping</code></div>
-        <p>A simple liveness probe that returns <code>{"result": "pong"}</code>. Works without a Hash Set.</p>
+        <p>Returns <code>{"result": "pong"}</code> when the service operates. This endpoint does not need a Hash Set.</p>
       </div>
     </div>
   </div>
@@ -477,8 +526,8 @@ curl -s localhost:5000/health</pre></div>
 
 <section class="band">
   <div class="wrap">
-    <h2>Run your own reference.</h2>
-    <p>There is no hosted endpoint. You provision and verify your own dataset and run your own instance, and every lookup is audited.</p>
+    <h2>Operate your own service.</h2>
+    <p>cybagard does not supply a public server. You prepare and verify the data. You operate the service. The service records each lookup.</p>
     <div class="cta">
       <a class="btn btn-gold" href="https://github.com/cybagard/nsrllookup">Source on GitHub</a>
       <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup/tree/main/docs/adr">Read the ADRs</a>
