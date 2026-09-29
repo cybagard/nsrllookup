@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nsrllookup · cybagard</title>
+<meta name="description" content="A forensic lookup API that answers whether file digests are known reference data in the NIST RDS V3 Modern Set — and names exactly which dataset answered.">
+<meta name="theme-color" content="#000000">
+<meta property="og:title" content="nsrllookup">
+<meta property="og:description" content="Provenanced NIST RDS V3 hash lookups. Separate the benign from the interesting.">
+<meta property="og:image" content="assets/mark-ink.png">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #FEFEF6;
+    --cream-2: #F6F3E6;
+    --ink: #000000;
+    --ink-2: #111110;
+    --gold: #C5B081;
+    --gold-deep: #8C7440;
+    --muted: #5A574E;
+    --line: #E4DDC8;
+
+    --bg: var(--cream);
+    --bg-alt: var(--cream-2);
+    --fg: var(--ink);
+    --fg-muted: var(--muted);
+    --accent: var(--gold-deep);
+    --border: var(--line);
+    --card: #FFFFFF;
+    --code-bg: var(--ink);
+    --code-fg: var(--cream);
+
+    --radius: 14px;
+    --maxw: 1120px;
+    --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0A0A09; --bg-alt: #141412; --fg: var(--cream); --fg-muted: #B5B0A2;
+      --accent: var(--gold); --border: #2A2822; --card: #121210;
+      --code-bg: #000; --code-fg: var(--cream);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0A0A09; --bg-alt: #141412; --fg: var(--cream); --fg-muted: #B5B0A2;
+    --accent: var(--gold); --border: #2A2822; --card: #121210;
+    --code-bg: #000; --code-fg: var(--cream);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  code, pre { font-family: var(--mono); }
+  :not(pre) > code {
+    font-size: .88em; padding: .1em .35em; border-radius: 6px;
+    background: color-mix(in srgb, var(--gold) 22%, transparent);
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 560px) { .wrap { padding: 0 16px; } }
+
+  .grid > *, .split > *, .step > *, .rings-wrap > * { min-width: 0; }
+
+  /* ---------- nav ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(0,0,0,.92); backdrop-filter: blur(8px);
+    color: var(--cream); border-bottom: 1px solid #1d1c19;
+  }
+  .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -.01em; }
+  .brand img { height: 30px; width: auto; }
+  .brand small { color: var(--gold); font-weight: 500; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .nav ul { display: flex; gap: 22px; list-style: none; margin: 0 0 0 auto; padding: 0; font-size: 15px; }
+  .nav ul a { text-decoration: none; opacity: .8; }
+  .nav ul a:hover { opacity: 1; color: var(--gold); }
+  .gh-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px;
+    border: 1px solid var(--gold); border-radius: 999px; color: var(--gold);
+    text-decoration: none; font-size: 14px; font-weight: 500; white-space: nowrap;
+  }
+  .gh-btn:hover { background: var(--gold); color: var(--ink); }
+  @media (max-width: 820px) { .nav ul { display: none; } .gh-btn { margin-left: auto; } }
+
+  /* ---------- hero ---------- */
+  .hero { background: var(--ink); color: var(--cream); position: relative; overflow: hidden; }
+  .hero .wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 48px; align-items: center; padding-top: 88px; padding-bottom: 96px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px; color: var(--gold);
+    font: 600 13px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  }
+  .eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--gold); }
+  .hero h1 { font-size: clamp(44px, 7vw, 84px); line-height: .98; letter-spacing: -.035em; margin: 20px 0 22px; }
+  .hero h1 span { color: var(--gold); }
+  .hero p.lede { font-size: 20px; color: #D9D6CB; max-width: 34ch; margin: 0 0 34px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px;
+    font-weight: 600; text-decoration: none; font-size: 16px; transition: transform .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-gold { background: var(--gold); color: var(--ink); }
+  .btn-ghost { border: 1px solid #3a3830; color: var(--cream); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .hero-mark { position: relative; display: grid; place-items: center; }
+  .hero-mark img { width: min(360px, 80%); height: auto; filter: drop-shadow(0 30px 60px rgba(197,176,129,.12)); }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 34px; }
+  .badges img { height: 20px; }
+  @media (max-width: 860px) {
+    .hero .wrap { grid-template-columns: 1fr; padding-top: 56px; padding-bottom: 64px; }
+    .hero-mark { order: -1; justify-items: start; }
+    .hero-mark img { width: 120px; }
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 96px 0; }
+  section.alt { background: var(--bg-alt); }
+  @media (max-width: 560px) { section { padding: 64px 0; } }
+  .sec-head { max-width: 720px; margin-bottom: 48px; }
+  .sec-head .eyebrow { color: var(--accent); }
+  .sec-head .eyebrow::before { background: var(--accent); }
+  h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -.025em; margin: 14px 0 14px; }
+  .sec-head p { color: var(--fg-muted); font-size: 19px; margin: 0; }
+  h3 { font-size: 20px; letter-spacing: -.01em; margin: 0 0 8px; }
+
+  .grid { display: grid; gap: 20px; }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 960px) { .g4 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .g4, .g2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 28px; position: relative;
+  }
+  .card p { color: var(--fg-muted); margin: 0; font-size: 16px; }
+  .card .num { font: 600 13px/1 var(--mono); color: var(--accent); letter-spacing: .1em; display: block; margin-bottom: 18px; }
+  .card.accent-top::before {
+    content: ""; position: absolute; left: 28px; top: 0; width: 40px; height: 3px; background: var(--gold);
+  }
+
+  /* ---------- provenance showcase ---------- */
+  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 36px; } }
+  .checklist { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 16px; }
+  .checklist li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; color: var(--fg-muted); }
+  .checklist li b { color: var(--fg); }
+  .tick {
+    width: 24px; height: 24px; border-radius: 50%; background: var(--gold); color: var(--ink);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 2px;
+  }
+
+  .term {
+    background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius);
+    border: 1px solid #22211d; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(0,0,0,.45);
+  }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #22211d; }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2c2a25; }
+  .term-bar i:first-child { background: var(--gold); }
+  .term-bar span { margin-left: 8px; font: 12px var(--mono); color: #8d897c; }
+  pre { margin: 0; padding: 20px 22px; overflow-x: auto; font-size: 13.5px; line-height: 1.65; }
+  .k { color: var(--gold); }
+  .s { color: #E9E4D2; }
+  .c { color: #7d7a70; }
+  .p { color: #8d897c; }
+  .hl { color: #000; background: var(--gold); padding: 0 4px; border-radius: 3px; }
+
+  /* ---------- integrity rings ---------- */
+  .rings-wrap { display: grid; grid-template-columns: 380px 1fr; gap: 56px; align-items: center; }
+  @media (max-width: 900px) { .rings-wrap { grid-template-columns: 1fr; } .rings { max-width: 320px; margin: 0 auto; } }
+  .rings { color: var(--fg); }
+  .rings svg { width: 100%; height: auto; display: block; }
+  .rings .r { fill: none; stroke-linecap: butt; }
+  .layers { display: grid; gap: 16px; }
+  .layer { display: grid; grid-template-columns: 56px 1fr; gap: 18px; align-items: start; padding: 22px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); }
+  .layer .lvl {
+    width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 18px var(--mono); border: 3px solid var(--fg);
+  }
+  .layer:nth-child(2) .lvl { border-color: var(--gold); }
+  .layer:nth-child(3) .lvl { background: var(--fg); color: var(--bg); }
+  .layer p { margin: 0; color: var(--fg-muted); font-size: 16px; }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  th { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); }
+  td.yes { color: var(--accent); font-weight: 700; }
+  td.no { color: var(--fg-muted); }
+  .pill { display: inline-block; font: 600 11px var(--mono); letter-spacing: .08em; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
+  .pill.on { background: var(--gold); color: var(--ink); }
+  .pill.off { border: 1px solid var(--border); color: var(--fg-muted); }
+  .table-card { padding: 8px 8px 0; overflow-x: auto; }
+  .note { font-size: 15px; color: var(--fg-muted); margin-top: 24px; }
+
+  /* ---------- quickstart ---------- */
+  .steps { counter-reset: step; display: grid; gap: 22px; }
+  .step { display: grid; grid-template-columns: 64px 1fr; gap: 22px; }
+  .step::before {
+    counter-increment: step; content: counter(step, decimal-leading-zero);
+    font: 700 22px var(--mono); color: var(--accent); padding-top: 4px;
+  }
+  .step h3 { margin-top: 2px; }
+  .step p { color: var(--fg-muted); margin: 0 0 14px; }
+  .step .term pre { font-size: 13px; }
+  @media (max-width: 560px) { .step { grid-template-columns: 1fr; gap: 6px; } }
+
+  /* ---------- api ---------- */
+  .ep { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .verb { font: 700 12px var(--mono); padding: 4px 9px; border-radius: 6px; background: var(--fg); color: var(--bg); letter-spacing: .06em; }
+  .verb.post { background: var(--gold); color: var(--ink); }
+  .ep code { font: 600 18px var(--mono); background: none; padding: 0; }
+  .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+  /* ---------- band / footer ---------- */
+  .band { background: var(--ink); color: var(--cream); text-align: center; }
+  .band h2 { color: var(--cream); }
+  .band p { color: #bdb9ad; max-width: 60ch; margin: 0 auto 32px; font-size: 19px; }
+  .band .cta { justify-content: center; }
+  footer { background: var(--ink); color: #8d897c; border-top: 1px solid #1d1c19; font-size: 14px; }
+  footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 28px; padding-bottom: 28px; flex-wrap: wrap; }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer .brand img { height: 26px; }
+  footer .brand { color: var(--cream); }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <img src="assets/mark-cream.png" alt="cybagard logo">
+      <span>nsrllookup</span>
+      <small>cybagard</small>
+    </a>
+    <ul>
+      <li><a href="#why">Why</a></li>
+      <li><a href="#integrity">Integrity</a></li>
+      <li><a href="#coverage">Coverage</a></li>
+      <li><a href="#quickstart">Quickstart</a></li>
+      <li><a href="#api">API</a></li>
+    </ul>
+    <a class="gh-btn" href="https://github.com/cybagard/nsrllookup">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">NIST RDS V3 · Modern Set</span>
+      <h1>Known files,<br><span>with provenance.</span></h1>
+      <p class="lede">A forensic lookup API that tells you which file digests are known reference data, and names exactly which dataset gave the answer.</p>
+      <div class="cta">
+        <a class="btn btn-gold" href="#quickstart">Get started →</a>
+        <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup">View on GitHub</a>
+      </div>
+      <div class="badges">
+        <a href="https://github.com/cybagard/nsrllookup/actions/workflows/test.yml"><img src="https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg" alt="Test status"></a>
+        <a href="https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml"><img src="https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg" alt="Build and scan status"></a>
+        <a href="https://github.com/cybagard/nsrllookup/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-C5B081.svg?labelColor=000000" alt="MIT license"></a>
+      </div>
+    </div>
+    <div class="hero-mark">
+      <img src="assets/mark-cream.png" alt="" width="440" height="512">
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section id="why">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Why nsrllookup</span>
+      <h2>Separate the benign from the interesting.</h2>
+      <p>Most files in a digital-evidence corpus are pre-existing reference data. nsrllookup marks those digests as <b>known</b> so you can set them aside, and every answer says where it came from.</p>
+    </div>
+    <div class="grid g4">
+      <div class="card accent-top">
+        <span class="num">01</span>
+        <h3>Provenanced answers</h3>
+        <p>Every result names the Set, the Release, the Delta releases applied, and the final <code>dbhash</code>. That is enough to check the answer against NIST yourself.</p>
+      </div>
+      <div class="card accent-top">
+        <span class="num">02</span>
+        <h3>Integrity in three layers</h3>
+        <p>The archive SHA-1, each inner file's SHA-256, and NIST's dbhash are all verified. If any layer fails, the Hash Set is never served.</p>
+      </div>
+      <div class="card accent-top">
+        <span class="num">03</span>
+        <h3>Public, but accountable</h3>
+        <p>Lookups need no login. Every session, accepted or rejected, is written to an append-only Audit Trail.</p>
+      </div>
+      <div class="card accent-top">
+        <span class="num">04</span>
+        <h3>No daemon, no RAM set</h3>
+        <p>One WSGI service reads a verified, read-only database. Each lookup is an indexed seek on disk.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap split">
+    <div>
+      <span class="eyebrow" style="color:var(--accent)">Lookup Result</span>
+      <h2>An answer you can re-verify.</h2>
+      <p style="color:var(--fg-muted);font-size:19px;margin:0">Send one Algorithm and any number of Digests. Each digest gets its own result, with the full dataset lineage attached.</p>
+      <ul class="checklist">
+        <li><span class="tick">✓</span><span><b>MD5, SHA-1, SHA-256.</b> Any letter case, normalised to uppercase.</span></li>
+        <li><span class="tick">✓</span><span><b>Per-item <code>invalid</code>.</b> A digest that doesn't parse never fails the whole batch.</span></li>
+        <li><span class="tick">✓</span><span><b>Readiness gate.</b> If the manifest is missing or doesn't match, the service returns <code>503</code> and answers nothing.</span></li>
+      </ul>
+    </div>
+    <div class="term" role="region" aria-label="Example request and response">
+      <div class="term-bar"><i></i><i></i><i></i><span>POST /check</span></div>
+<pre><span class="p">$</span> curl -s -X POST localhost:5000/check \
+    -H <span class="s">'Content-Type: application/json'</span> \
+    -d <span class="s">'{"algorithm":"sha256","hashes":["ad7b9c14…"]}'</span>
+
+{
+  <span class="k">"results"</span>: [{
+    <span class="k">"digest"</span>: <span class="s">"AD7B9C14…"</span>,
+    <span class="k">"algorithm"</span>: <span class="s">"sha256"</span>,
+    <span class="k">"status"</span>: <span class="hl">"known"</span>,
+    <span class="k">"dataset"</span>: {
+      <span class="k">"set"</span>: <span class="s">"modern"</span>,
+      <span class="k">"release"</span>: <span class="s">"2026.03.1"</span>,
+      <span class="k">"deltas"</span>: [<span class="s">"2026.06.1"</span>],
+      <span class="k">"dbhash"</span>: <span class="s">"481e5f55f6d1ed63ea0f176779efc5cc5d53e52a"</span>
+    }
+  }]
+}</pre>
+    </div>
+  </div>
+</section>
+
+<section id="integrity">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Provisioning</span>
+      <h2>Three rings of trust.</h2>
+      <p>The Provisioner checks every layer and records all three values in a <b>Provisioning manifest</b>. At startup the service is <b>ready</b> only if that manifest still matches the mounted Hash Set.</p>
+    </div>
+    <div class="rings-wrap">
+      <div class="rings" aria-hidden="true">
+        <svg viewBox="0 0 200 200">
+          <circle class="r" cx="100" cy="100" r="88" stroke="currentColor" stroke-width="12" stroke-dasharray="470 83" transform="rotate(-60 100 100)"/>
+          <circle class="r" cx="100" cy="100" r="64" stroke="#C5B081" stroke-width="12" stroke-dasharray="330 72" transform="rotate(120 100 100)"/>
+          <circle class="r" cx="100" cy="100" r="40" stroke="currentColor" stroke-width="12" stroke-dasharray="200 51" transform="rotate(-30 100 100)"/>
+          <circle cx="100" cy="100" r="9" fill="#C5B081"/>
+        </svg>
+      </div>
+      <div class="layers">
+        <div class="layer">
+          <div class="lvl">1</div>
+          <div><h3>Archive SHA-1</h3><p>The downloaded release archive must match NIST's published <code>.sha</code> sidecar.</p></div>
+        </div>
+        <div class="layer">
+          <div class="lvl">2</div>
+          <div><h3>Inner-file SHA-256</h3><p>Every file inside the archive is checked against <code>signatures.txt</code>.</p></div>
+        </div>
+        <div class="layer">
+          <div class="lvl">3</div>
+          <div><h3>Final dbhash</h3><p>Once all deltas are applied, the database must match NIST's published <code>dbhashes.txt</code> for the last Release.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="coverage" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">NSRL coverage</span>
+      <h2>What it answers today.</h2>
+      <p>One of NIST's four Sets, in the compact <b>Minimal</b> form (about 18 GB, compared with about 124 GB for the full Modern set). Delta releases keep it current without downloading the base again.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card table-card">
+        <table>
+          <thead><tr><th>Set</th><th>Status</th><th>Form</th></tr></thead>
+          <tbody>
+            <tr><td><b>Modern</b></td><td><span class="pill on">Served</span></td><td>Minimal (~18 GB)</td></tr>
+            <tr><td>Legacy</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
+            <tr><td>Android</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
+            <tr><td>iOS</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card table-card">
+        <table>
+          <thead><tr><th>Algorithm</th><th>Lookup</th></tr></thead>
+          <tbody>
+            <tr><td><b>MD5</b></td><td class="yes">Yes</td></tr>
+            <tr><td><b>SHA-1</b></td><td class="yes">Yes</td></tr>
+            <tr><td><b>SHA-256</b></td><td class="yes">Yes</td></tr>
+            <tr><td>CRC-32</td><td class="no">No: stored in every row, but too weak a checksum to support</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="note"><b>Cadence:</b> NIST publishes a full Release every March and Delta releases in June, September and December. <code>/health</code> reports exactly which ones are loaded.</p>
+  </div>
+</section>
+
+<section id="quickstart">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Quickstart</span>
+      <h2>From zero to a verified answer.</h2>
+      <p>You can run the fixture-based test suite with no data at all. Serving real lookups needs a one-time download of about 19 GiB and roughly 260 GiB of free disk at peak.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3>Try it without any data</h3>
+          <p>Build the image and run the self-contained suite, including an end-to-end boot smoke test.</p>
+          <div class="term"><pre>docker-compose -f docker-compose.build.yml up --build api-test</pre></div>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Provision the Hash Set</h3>
+          <p>Fetch the Release and its Delta releases (oldest to newest), verify all three layers, build the index, and write <code>rds.db</code> and the manifest into <code>./data</code>.</p>
+          <div class="term"><pre>make provision RELEASE=2026.03.1 DELTAS=<span class="s">"2026.06.1 2026.09.1"</span>
+make verify</pre></div>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Serve and look up</h3>
+          <p>Start the API on port 5000 against the mounted volume, check provenance, then send digests.</p>
+          <div class="term"><pre>docker-compose -f docker-compose.prod.yml up -d api
+curl -s localhost:5000/health</pre></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="api" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">API</span>
+      <h2>Three endpoints.</h2>
+    </div>
+    <div class="grid g3">
+      <div class="card">
+        <div class="ep"><span class="verb post">POST</span><code>/check</code></div>
+        <p>One Algorithm with one or more Digests. Returns one Lookup Result per digest: <code>known</code>, <code>unknown</code> or <code>invalid</code>.</p>
+        <div class="status-row"><span class="pill on">200</span><span class="pill off">4xx rejected</span><span class="pill off">503 not ready</span></div>
+      </div>
+      <div class="card">
+        <div class="ep"><span class="verb">GET</span><code>/health</code></div>
+        <p>The loaded Set, Release, Delta releases and final dbhash, plus a <code>ready</code> flag. Check this before you trust any answers.</p>
+      </div>
+      <div class="card">
+        <div class="ep"><span class="verb">GET</span><code>/ping</code></div>
+        <p>A simple liveness probe that returns <code>{"result": "pong"}</code>. Works without a Hash Set.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Run your own reference.</h2>
+    <p>There is no hosted endpoint. You provision and verify your own dataset and run your own instance, and every lookup is audited.</p>
+    <div class="cta">
+      <a class="btn btn-gold" href="https://github.com/cybagard/nsrllookup">Source on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup/tree/main/docs/adr">Read the ADRs</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="https://github.com/cybagard"><img src="assets/mark-cream.png" alt="cybagard logo"><span>cybagard</span></a>
+    <span>MIT licensed · Data: <a href="https://www.nist.gov/itl/ssd/software-quality-group/national-software-reference-library-nsrl">NIST NSRL</a> · <a href="https://github.com/cybagard/nsrllookup">cybagard/nsrllookup</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
