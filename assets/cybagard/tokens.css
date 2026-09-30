@@ -1,0 +1,71 @@
+/* cybagard tokens 2.0.0. Load fonts.css first, then this file, then components/cybagard.css. */
+:root {
+  --ink: #000000;
+  --cream: #fefef6;
+  --gold: #c5b081;
+  --gold-deep: #8c7440;
+  --ink-2: #111110;
+  --cream-2: #f6f3e6;
+  --bg: #fefef6;
+  --bg-alt: #f6f3e6;
+  --card: #ffffff;
+  --fg: #000000;
+  --fg-muted: #5a574e;
+  --accent: #8c7440;
+  --border: #e4ddc8;
+  --code-bg: #000000;
+  --code-fg: #fefef6;
+  --on-ink-muted: #d9d6cb;
+  --on-ink-soft: #bdb9ad;
+  --on-ink-subtle: #8d897c;
+  --ink-line: #1d1c19;
+  --ink-border: #3a3830;
+  --term-border: #22211d;
+  --term-dot: #2c2a25;
+  --syntax-string: #e9e4d2;
+  --syntax-comment: #7d7a70;
+  --syntax-key: var(--gold);
+  --font-sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 48px;
+  --space-9: 56px;
+  --space-10: 64px;
+  --space-11: 96px;
+  --container: 1120px;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-callout: 10px;
+  --radius: 14px;
+  --radius-pill: 999px;
+  --shadow-term: 0 30px 60px -30px rgba(0,0,0,0.45);
+  --shadow-mark-glow: 0 30px 60px rgba(197,176,129,0.12);
+}
+@media (prefers-color-scheme: dark) {
+ :root:not([data-theme="light"]) {
+  --bg: #0a0a09;
+  --bg-alt: #141412;
+  --card: #121210;
+  --fg: #fefef6;
+  --fg-muted: #b5b0a2;
+  --accent: #c5b081;
+  --border: #2a2822;
+  color-scheme: dark;
+ }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0a09;
+  --bg-alt: #141412;
+  --card: #121210;
+  --fg: #fefef6;
+  --fg-muted: #b5b0a2;
+  --accent: #c5b081;
+  --border: #2a2822;
+  color-scheme: dark;
+}

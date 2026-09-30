@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,256 +8,19 @@
 <meta name="theme-color" content="#000000">
 <meta property="og:title" content="nsrllookup">
 <meta property="og:description" content="Find the known files in your evidence. Examine only the unknown files.">
-<meta property="og:image" content="assets/mark-ink.png">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --cream: #FEFEF6;
-    --cream-2: #F6F3E6;
-    --ink: #000000;
-    --ink-2: #111110;
-    --gold: #C5B081;
-    --gold-deep: #8C7440;
-    --muted: #5A574E;
-    --line: #E4DDC8;
-
-    --bg: var(--cream);
-    --bg-alt: var(--cream-2);
-    --fg: var(--ink);
-    --fg-muted: var(--muted);
-    --accent: var(--gold-deep);
-    --border: var(--line);
-    --card: #FFFFFF;
-    --code-bg: var(--ink);
-    --code-fg: var(--cream);
-
-    --radius: 14px;
-    --maxw: 1120px;
-    --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0A0A09; --bg-alt: #141412; --fg: var(--cream); --fg-muted: #B5B0A2;
-      --accent: var(--gold); --border: #2A2822; --card: #121210;
-      --code-bg: #000; --code-fg: var(--cream);
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0A0A09; --bg-alt: #141412; --fg: var(--cream); --fg-muted: #B5B0A2;
-    --accent: var(--gold); --border: #2A2822; --card: #121210;
-    --code-bg: #000; --code-fg: var(--cream);
-  }
-
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
-  }
-  a { color: inherit; }
-  code, pre { font-family: var(--mono); }
-  :not(pre) > code {
-    font-size: .88em; padding: .1em .35em; border-radius: 6px;
-    background: color-mix(in srgb, var(--gold) 22%, transparent);
-  }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
-  @media (max-width: 560px) { .wrap { padding: 0 16px; } }
-
-  .grid > *, .split > *, .step > *, .rings-wrap > * { min-width: 0; }
-
-  /* ---------- nav ---------- */
-  .nav {
-    position: sticky; top: 0; z-index: 10;
-    background: rgba(0,0,0,.92); backdrop-filter: blur(8px);
-    color: var(--cream); border-bottom: 1px solid #1d1c19;
-  }
-  .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
-  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -.01em; }
-  .brand img { height: 30px; width: auto; }
-  .brand small { color: var(--gold); font-weight: 500; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
-  .nav ul { display: flex; gap: 22px; list-style: none; margin: 0 0 0 auto; padding: 0; font-size: 15px; }
-  .nav ul a { text-decoration: none; opacity: .8; }
-  .nav ul a:hover { opacity: 1; color: var(--gold); }
-  .gh-btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px;
-    border: 1px solid var(--gold); border-radius: 999px; color: var(--gold);
-    text-decoration: none; font-size: 14px; font-weight: 500; white-space: nowrap;
-  }
-  .gh-btn:hover { background: var(--gold); color: var(--ink); }
-  @media (max-width: 820px) { .nav ul { display: none; } .gh-btn { margin-left: auto; } }
-
-  /* ---------- hero ---------- */
-  .hero { background: var(--ink); color: var(--cream); position: relative; overflow: hidden; }
-  .hero .wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 48px; align-items: center; padding-top: 88px; padding-bottom: 96px; }
-  .eyebrow {
-    display: inline-flex; align-items: center; gap: 10px; color: var(--gold);
-    font: 600 13px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  }
-  .eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--gold); }
-  .hero h1 { font-size: clamp(44px, 7vw, 84px); line-height: .98; letter-spacing: -.035em; margin: 20px 0 22px; }
-  .hero h1 span { color: var(--gold); }
-  .hero p.lede { font-size: 20px; color: #D9D6CB; max-width: 34ch; margin: 0 0 34px; }
-  .cta { display: flex; flex-wrap: wrap; gap: 14px; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px;
-    font-weight: 600; text-decoration: none; font-size: 16px; transition: transform .15s ease;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btn-gold { background: var(--gold); color: var(--ink); }
-  .btn-ghost { border: 1px solid #3a3830; color: var(--cream); }
-  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
-  .hero-mark { position: relative; display: grid; place-items: center; }
-  .hero-mark img { width: min(360px, 80%); height: auto; filter: drop-shadow(0 30px 60px rgba(197,176,129,.12)); }
-  @media (max-width: 860px) {
-    .hero .wrap { grid-template-columns: 1fr; padding-top: 56px; padding-bottom: 64px; }
-    .hero-mark { order: -1; justify-items: start; }
-    .hero-mark img { width: 120px; }
-  }
-
-  /* ---------- sections ---------- */
-  section { padding: 96px 0; }
-  section.alt { background: var(--bg-alt); }
-  @media (max-width: 560px) { section { padding: 64px 0; } }
-  .sec-head { max-width: 720px; margin-bottom: 48px; }
-  .sec-head .eyebrow { color: var(--accent); }
-  .sec-head .eyebrow::before { background: var(--accent); }
-  h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -.025em; margin: 14px 0 14px; }
-  .sec-head p { color: var(--fg-muted); font-size: 19px; margin: 0; }
-  h3 { font-size: 20px; letter-spacing: -.01em; margin: 0 0 8px; }
-
-  .grid { display: grid; gap: 20px; }
-  .g4 { grid-template-columns: repeat(4, 1fr); }
-  .g3 { grid-template-columns: repeat(3, 1fr); }
-  .g2 { grid-template-columns: repeat(2, 1fr); }
-  @media (max-width: 960px) { .g4 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: 1fr; } }
-  @media (max-width: 700px) { .g4, .g2 { grid-template-columns: 1fr; } }
-
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 28px; position: relative;
-  }
-  .card p { color: var(--fg-muted); margin: 0; font-size: 16px; }
-  .card .num { font: 600 13px/1 var(--mono); color: var(--accent); letter-spacing: .1em; display: block; margin-bottom: 18px; }
-  .card.accent-top::before {
-    content: ""; position: absolute; left: 28px; top: 0; width: 40px; height: 3px; background: var(--gold);
-  }
-
-  /* ---------- triage flow ---------- */
-  .flow { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1.3fr; align-items: stretch; }
-  .flow .arrow { display: grid; place-items: center; color: var(--accent); font: 700 24px var(--mono); }
-  .flow .card h3 { margin-top: 4px; }
-  .outcomes { display: grid; gap: 14px; }
-  .outcome { border-radius: var(--radius); padding: 20px 22px; border: 1px solid var(--border); background: var(--card); }
-  .outcome p { margin: 6px 0 0; color: var(--fg-muted); font-size: 16px; }
-  .outcome.known { background: var(--bg-alt); }
-  .outcome.unknown { border: 2px solid var(--gold); }
-  .outcome .pill { margin-right: 6px; }
-  .caution {
-    margin-top: 28px; padding: 18px 22px; border-left: 4px solid var(--gold);
-    background: color-mix(in srgb, var(--gold) 12%, transparent); border-radius: 0 10px 10px 0;
-    color: var(--fg); font-size: 16px;
-  }
-  .caution b { color: var(--accent); letter-spacing: .06em; font-family: var(--mono); font-size: 13px; margin-right: 8px; }
-  @media (max-width: 900px) {
-    .flow { grid-template-columns: 1fr; }
-    .flow .arrow { height: 40px; transform: rotate(90deg); }
-  }
-
-  /* ---------- provenance showcase ---------- */
-  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; }
-  @media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 36px; } }
-  .checklist { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 16px; }
-  .checklist li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; color: var(--fg-muted); }
-  .checklist li b { color: var(--fg); }
-  .tick {
-    width: 24px; height: 24px; border-radius: 50%; background: var(--gold); color: var(--ink);
-    display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 2px;
-  }
-
-  .term {
-    background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius);
-    border: 1px solid #22211d; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(0,0,0,.45);
-  }
-  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #22211d; }
-  .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2c2a25; }
-  .term-bar i:first-child { background: var(--gold); }
-  .term-bar span { margin-left: 8px; font: 12px var(--mono); color: #8d897c; }
-  pre { margin: 0; padding: 20px 22px; overflow-x: auto; font-size: 13.5px; line-height: 1.65; }
-  .k { color: var(--gold); }
-  .s { color: #E9E4D2; }
-  .c { color: #7d7a70; }
-  .p { color: #8d897c; }
-  .hl { color: #000; background: var(--gold); padding: 0 4px; border-radius: 3px; }
-
-  /* ---------- integrity rings ---------- */
-  .rings-wrap { display: grid; grid-template-columns: 380px 1fr; gap: 56px; align-items: center; }
-  @media (max-width: 900px) { .rings-wrap { grid-template-columns: 1fr; } .rings { max-width: 320px; margin: 0 auto; } }
-  .rings { color: var(--fg); }
-  .rings svg { width: 100%; height: auto; display: block; }
-  .rings .r { fill: none; stroke-linecap: butt; }
-  .layers { display: grid; gap: 16px; }
-  .layer { display: grid; grid-template-columns: 56px 1fr; gap: 18px; align-items: start; padding: 22px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); }
-  .layer .lvl {
-    width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
-    font: 700 18px var(--mono); border: 3px solid var(--fg);
-  }
-  .layer:nth-child(2) .lvl { border-color: var(--gold); }
-  .layer:nth-child(3) .lvl { background: var(--fg); color: var(--bg); }
-  .layer p { margin: 0; color: var(--fg-muted); font-size: 16px; }
-
-  /* ---------- tables ---------- */
-  table { width: 100%; border-collapse: collapse; font-size: 16px; }
-  th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-  th { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); }
-  td.yes { color: var(--accent); font-weight: 700; }
-  td.no { color: var(--fg-muted); }
-  .pill { display: inline-block; font: 600 11px var(--mono); letter-spacing: .08em; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
-  .pill.on { background: var(--gold); color: var(--ink); }
-  .pill.off { border: 1px solid var(--border); color: var(--fg-muted); }
-  .table-card { padding: 8px 8px 0; overflow-x: auto; }
-  .note { font-size: 15px; color: var(--fg-muted); margin-top: 24px; }
-
-  /* ---------- quickstart ---------- */
-  .steps { counter-reset: step; display: grid; gap: 22px; }
-  .step { display: grid; grid-template-columns: 64px 1fr; gap: 22px; }
-  .step::before {
-    counter-increment: step; content: counter(step, decimal-leading-zero);
-    font: 700 22px var(--mono); color: var(--accent); padding-top: 4px;
-  }
-  .step h3 { margin-top: 2px; }
-  .step p { color: var(--fg-muted); margin: 0 0 14px; }
-  .step .term pre { font-size: 13px; }
-  @media (max-width: 560px) { .step { grid-template-columns: 1fr; gap: 6px; } }
-
-  /* ---------- api ---------- */
-  .ep { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-  .verb { font: 700 12px var(--mono); padding: 4px 9px; border-radius: 6px; background: var(--fg); color: var(--bg); letter-spacing: .06em; }
-  .verb.post { background: var(--gold); color: var(--ink); }
-  .ep code { font: 600 18px var(--mono); background: none; padding: 0; }
-  .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-
-  /* ---------- band / footer ---------- */
-  .band { background: var(--ink); color: var(--cream); text-align: center; }
-  .band h2 { color: var(--cream); }
-  .band p { color: #bdb9ad; max-width: 60ch; margin: 0 auto 32px; font-size: 19px; }
-  .band .cta { justify-content: center; }
-  footer { background: var(--ink); color: #8d897c; border-top: 1px solid #1d1c19; font-size: 14px; }
-  footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 28px; padding-bottom: 28px; flex-wrap: wrap; }
-  footer a { color: var(--gold); text-decoration: none; }
-  footer .brand img { height: 26px; }
-  footer .brand { color: var(--cream); }
-</style>
+<meta property="og:image" content="assets/cybagard/logos/mark-ink.png">
+<link rel="icon" type="image/png" href="assets/cybagard/logos/favicon.png">
+<link rel="stylesheet" href="assets/cybagard/fonts.css">
+<link rel="stylesheet" href="assets/cybagard/tokens.css">
+<link rel="stylesheet" href="assets/cybagard/cybagard.css">
 </head>
-<body>
+<body class="cg-root">
+<a class="cg-skip" href="#main">Go to the content</a>
 
-<nav class="nav" aria-label="Primary">
-  <div class="wrap">
-    <a class="brand" href="#top">
-      <img src="assets/mark-cream.png" alt="cybagard logo">
+<nav class="cg-nav" aria-label="Primary">
+  <div class="cg-wrap">
+    <a class="cg-brand" href="#top">
+      <img src="assets/cybagard/logos/mark-cream.png" alt="" width="30" height="30">
       <span>nsrllookup</span>
       <small>cybagard</small>
     </a>
@@ -269,112 +32,112 @@
       <li><a href="#quickstart">Quickstart</a></li>
       <li><a href="#api">API</a></li>
     </ul>
-    <a class="gh-btn" href="https://github.com/cybagard/nsrllookup">
+    <a class="cg-btn-outline" href="https://github.com/cybagard/nsrllookup">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
     </a>
   </div>
 </nav>
 
-<header class="hero" id="top">
-  <div class="wrap">
+<header class="cg-hero" id="top">
+  <div class="cg-wrap">
     <div>
-      <span class="eyebrow">NIST RDS V3 · Modern Set</span>
-      <h1>Find known files.<br><span>Show the source.</span></h1>
-      <p class="lede">nsrllookup is a forensic lookup API. It compares file hashes with the NIST Reference Data Set. Each answer shows the dataset that gave it.</p>
-      <div class="cta">
-        <a class="btn btn-gold" href="#quickstart">Get started →</a>
-        <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup">View on GitHub</a>
+      <span class="cg-eyebrow">NIST RDS V3 · Modern Set</span>
+      <h1 class="cg-h1">Find known files.<br><span>Show the source.</span></h1>
+      <p class="cg-hero__lede">nsrllookup is a forensic lookup API. It compares file hashes with the NIST Reference Data Set. Each answer shows the dataset that gave it.</p>
+      <div class="cg-cta">
+        <a class="cg-btn cg-btn--gold" href="#quickstart">Start the service →</a>
+        <a class="cg-btn cg-btn--ghost" href="https://github.com/cybagard/nsrllookup">View on GitHub</a>
       </div>
     </div>
-    <div class="hero-mark">
-      <img src="assets/mark-cream.png" alt="" width="512" height="512">
+    <div class="cg-hero__mark">
+      <img src="assets/cybagard/logos/mark-cream.png" alt="" width="512" height="512">
     </div>
   </div>
 </header>
 
-<main>
+<main id="main">
 
-<section id="why">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Why nsrllookup</span>
-      <h2>Remove the known files. Examine the remaining files.</h2>
+<section class="cg-section" id="why">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">Why nsrllookup</span>
+      <h2 class="cg-h2">Remove the known files. Examine the remaining files.</h2>
       <p>A seized disk can contain one million files or more. Most of these files come from operating systems and standard software. They are not evidence. nsrllookup finds these files, so that you can put your time into the files that remain.</p>
     </div>
-    <div class="flow">
-      <div class="card accent-top">
-        <span class="num">STEP 1</span>
-        <h3>Calculate the hashes</h3>
+    <div class="cg-flow">
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">STEP 1</span>
+        <h3 class="cg-h3">Calculate the hashes</h3>
         <p>Use your forensic tool to calculate an MD5, SHA-1 or SHA-256 hash for each file in the evidence.</p>
       </div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="card accent-top">
-        <span class="num">STEP 2</span>
-        <h3>Send the hashes</h3>
+      <div class="cg-flow__arrow" aria-hidden="true">→</div>
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">STEP 2</span>
+        <h3 class="cg-h3">Send the hashes</h3>
         <p>Send the hashes to nsrllookup. It compares each hash with the NIST list of files from published software.</p>
       </div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="outcomes">
-        <div class="outcome known">
-          <span class="pill off">known</span><b>Put the file aside.</b>
+      <div class="cg-flow__arrow" aria-hidden="true">→</div>
+      <div class="cg-outcomes">
+        <div class="cg-outcome cg-outcome--muted">
+          <span class="cg-pill cg-pill--off">known</span><b>Put the file aside.</b>
           <p>NIST recorded this file in published software.</p>
         </div>
-        <div class="outcome unknown">
-          <span class="pill on">unknown</span><b>Examine the file.</b>
+        <div class="cg-outcome cg-outcome--gold">
+          <span class="cg-pill cg-pill--on">unknown</span><b>Examine the file.</b>
           <p>NIST has no record of this file. It can be user data, a custom file or malware.</p>
         </div>
       </div>
     </div>
-    <p class="caution"><b>NOTE</b>A <code>known</code> result does not mean that the file is safe. It means only that NIST found the file in published software. An <code>unknown</code> result does not mean that the file is malicious.</p>
+    <p class="cg-callout"><b>NOTE</b>A <code>known</code> result does not mean that the file is safe. It means only that NIST found the file in published software. An <code>unknown</code> result does not mean that the file is malicious.</p>
   </div>
 </section>
 
-<section id="features" class="alt">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Features</span>
-      <h2>Answers that you can check.</h2>
+<section class="cg-section cg-section--alt" id="features">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">Features</span>
+      <h2 class="cg-h2">Answers that you can check.</h2>
     </div>
-    <div class="grid g4">
-      <div class="card accent-top">
-        <span class="num">01</span>
-        <h3>Each answer shows its source</h3>
+    <div class="cg-grid cg-g4">
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">01</span>
+        <h3 class="cg-h3">Each answer shows its source</h3>
         <p>Each result shows the Set, the Release, the Delta releases and the final <code>dbhash</code>. Use these values to check the answer with NIST.</p>
       </div>
-      <div class="card accent-top">
-        <span class="num">02</span>
-        <h3>Three integrity checks</h3>
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">02</span>
+        <h3 class="cg-h3">Three integrity checks</h3>
         <p>The Provisioner checks the archive SHA-1, the SHA-256 of each inner file and the NIST dbhash. If one check fails, the service does not use the data.</p>
       </div>
-      <div class="card accent-top">
-        <span class="num">03</span>
-        <h3>Public, with an audit record</h3>
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">03</span>
+        <h3 class="cg-h3">Public, with an audit record</h3>
         <p>The API does not require a login. The service records each lookup session in an append-only Audit Trail. This includes rejected sessions.</p>
       </div>
-      <div class="card accent-top">
-        <span class="num">04</span>
-        <h3>One service, low memory</h3>
+      <div class="cg-card cg-card--accent-top">
+        <span class="cg-card__num">04</span>
+        <h3 class="cg-h3">One service, low memory</h3>
         <p>One WSGI service reads a verified, read-only database. Each lookup reads an index on the disk. The dataset does not stay in memory.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap split">
+<section class="cg-section">
+  <div class="cg-wrap cg-split">
     <div>
-      <span class="eyebrow" style="color:var(--accent)">Lookup Result</span>
-      <h2>Each answer shows its source.</h2>
-      <p style="color:var(--fg-muted);font-size:19px;margin:0">Send one Algorithm and one or more Digests. The service returns one result for each digest. Each result identifies the dataset.</p>
-      <ul class="checklist">
-        <li><span class="tick">✓</span><span><b>MD5, SHA-1 and SHA-256.</b> Use uppercase or lowercase letters. The service changes all letters to uppercase.</span></li>
-        <li><span class="tick">✓</span><span><b>One result for each digest.</b> If a digest is not correct, its result is <code>invalid</code>. The other digests get a usual result.</span></li>
-        <li><span class="tick">✓</span><span><b>Readiness gate.</b> If the manifest is missing or does not agree with the data, the service returns <code>503</code>. It gives no answers.</span></li>
+      <span class="cg-eyebrow">Lookup Result</span>
+      <h2 class="cg-h2">Each answer shows its source.</h2>
+      <p class="cg-lede">Send one Algorithm and one or more Digests. The service returns one result for each digest. Each result identifies the dataset.</p>
+      <ul class="cg-checklist">
+        <li><span class="cg-tick" aria-hidden="true">✓</span><span><b>MD5, SHA-1 and SHA-256.</b> Use uppercase or lowercase letters. The service changes all letters to uppercase.</span></li>
+        <li><span class="cg-tick" aria-hidden="true">✓</span><span><b>One result for each digest.</b> If a digest is not correct, its result is <code>invalid</code>. The other digests receive a usual result.</span></li>
+        <li><span class="cg-tick" aria-hidden="true">✓</span><span><b>Readiness gate.</b> If the manifest is missing or does not agree with the data, the service returns <code>503</code>. It gives no answers.</span></li>
       </ul>
     </div>
-    <div class="term" role="region" aria-label="Example request and response">
-      <div class="term-bar"><i></i><i></i><i></i><span>POST /check</span></div>
+    <div class="cg-term" role="region" aria-label="Example request and response">
+      <div class="cg-term__bar"><i></i><i></i><i></i><span>POST /check</span></div>
 <pre><span class="p">$</span> curl -s -X POST localhost:5000/check \
     -H <span class="s">'Content-Type: application/json'</span> \
     -d <span class="s">'{"algorithm":"sha256","hashes":["ad7b9c14…"]}'</span>
@@ -396,61 +159,61 @@
   </div>
 </section>
 
-<section id="integrity" class="alt">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Provisioning</span>
-      <h2>Three integrity checks.</h2>
+<section class="cg-section cg-section--alt" id="integrity">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">Provisioning</span>
+      <h2 class="cg-h2">Three integrity checks.</h2>
       <p>The Provisioner does the three checks below. It writes the three values into the <b>Provisioning manifest</b>. At startup, the service compares the manifest with the Hash Set. The service is <b>ready</b> only if they agree.</p>
     </div>
-    <div class="rings-wrap">
-      <div class="rings" aria-hidden="true">
+    <div class="cg-rings-wrap">
+      <div class="cg-rings" aria-hidden="true">
         <svg viewBox="0 0 200 200">
-          <circle class="r" cx="100" cy="100" r="88" stroke="currentColor" stroke-width="12" stroke-dasharray="470 83" transform="rotate(-60 100 100)"/>
-          <circle class="r" cx="100" cy="100" r="64" stroke="#C5B081" stroke-width="12" stroke-dasharray="330 72" transform="rotate(120 100 100)"/>
-          <circle class="r" cx="100" cy="100" r="40" stroke="currentColor" stroke-width="12" stroke-dasharray="200 51" transform="rotate(-30 100 100)"/>
-          <circle cx="100" cy="100" r="9" fill="#C5B081"/>
+          <circle cx="100" cy="100" r="88" stroke="currentColor" stroke-width="12" stroke-dasharray="470 83" transform="rotate(-60 100 100)"/>
+          <circle cx="100" cy="100" r="64" stroke="#C5B081" stroke-width="12" stroke-dasharray="330 72" transform="rotate(120 100 100)"/>
+          <circle cx="100" cy="100" r="40" stroke="currentColor" stroke-width="12" stroke-dasharray="200 51" transform="rotate(-30 100 100)"/>
+          <circle cx="100" cy="100" r="9"/>
         </svg>
       </div>
-      <div class="layers">
-        <div class="layer">
-          <div class="lvl">1</div>
-          <div><h3>Archive SHA-1</h3><p>The Provisioner compares the SHA-1 of the Release archive with the NIST <code>.sha</code> file.</p></div>
+      <div class="cg-layers">
+        <div class="cg-layer">
+          <div class="cg-layer__lvl">1</div>
+          <div><h3 class="cg-h3">Archive SHA-1</h3><p>The Provisioner compares the SHA-1 of the Release archive with the NIST <code>.sha</code> file.</p></div>
         </div>
-        <div class="layer">
-          <div class="lvl">2</div>
-          <div><h3>Inner-file SHA-256</h3><p>The Provisioner compares the SHA-256 of each file in the archive with <code>signatures.txt</code>.</p></div>
+        <div class="cg-layer">
+          <div class="cg-layer__lvl">2</div>
+          <div><h3 class="cg-h3">Inner-file SHA-256</h3><p>The Provisioner compares the SHA-256 of each file in the archive with <code>signatures.txt</code>.</p></div>
         </div>
-        <div class="layer">
-          <div class="lvl">3</div>
-          <div><h3>Final dbhash</h3><p>The Provisioner applies all Delta releases. Then it compares the database hash with the NIST <code>dbhashes.txt</code> value for the last Release.</p></div>
+        <div class="cg-layer">
+          <div class="cg-layer__lvl">3</div>
+          <div><h3 class="cg-h3">Final dbhash</h3><p>The Provisioner applies all Delta releases. Then it compares the database hash with the NIST <code>dbhashes.txt</code> value for the last Release.</p></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section id="coverage">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">NSRL coverage</span>
-      <h2>Available data.</h2>
+<section class="cg-section" id="coverage">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">NSRL coverage</span>
+      <h2 class="cg-h2">Available data.</h2>
       <p>NIST supplies four Sets. nsrllookup uses one Set: <b>Modern</b>, in the <b>Minimal</b> form. The Minimal form is approximately 18 GB. The full Modern Set is approximately 124 GB. Delta releases update the data. You do not download the base Release again.</p>
     </div>
-    <div class="grid g2">
-      <div class="card table-card">
-        <table>
+    <div class="cg-grid cg-g2">
+      <div class="cg-card cg-table-card">
+        <table class="cg-table">
           <thead><tr><th>Set</th><th>Status</th><th>Form</th></tr></thead>
           <tbody>
-            <tr><td><b>Modern</b></td><td><span class="pill on">Served</span></td><td>Minimal (~18 GB)</td></tr>
-            <tr><td>Legacy</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
-            <tr><td>Android</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
-            <tr><td>iOS</td><td><span class="pill off">Later</span></td><td class="no">—</td></tr>
+            <tr><td><b>Modern</b></td><td><span class="cg-pill cg-pill--on">Served</span></td><td>Minimal (~18 GB)</td></tr>
+            <tr><td>Legacy</td><td><span class="cg-pill cg-pill--off">Later</span></td><td class="no">—</td></tr>
+            <tr><td>Android</td><td><span class="cg-pill cg-pill--off">Later</span></td><td class="no">—</td></tr>
+            <tr><td>iOS</td><td><span class="cg-pill cg-pill--off">Later</span></td><td class="no">—</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="card table-card">
-        <table>
+      <div class="cg-card cg-table-card">
+        <table class="cg-table">
           <thead><tr><th>Algorithm</th><th>Lookup</th></tr></thead>
           <tbody>
             <tr><td><b>MD5</b></td><td class="yes">Yes</td></tr>
@@ -461,38 +224,38 @@
         </table>
       </div>
     </div>
-    <p class="note"><b>Cadence:</b> NIST publishes a full Release in March. NIST publishes Delta releases in June, September and December. <code>/health</code> shows the Release and Delta releases that the service uses.</p>
+    <p class="cg-note"><b>Cadence:</b> NIST publishes a full Release in March. NIST publishes Delta releases in June, September and December. <code>/health</code> shows the Release and Delta releases that the service uses.</p>
   </div>
 </section>
 
-<section id="quickstart" class="alt">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Quickstart</span>
-      <h2>Get started.</h2>
-      <p>The test suite uses test data. It does not need the NIST data. For real lookups, you must download approximately 19 GiB one time. You must have approximately 260 GiB of free disk space.</p>
+<section class="cg-section cg-section--alt" id="quickstart">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">Quickstart</span>
+      <h2 class="cg-h2">Start the service.</h2>
+      <p>The test suite uses test data. It does not use the NIST data. For real lookups, you must download approximately 19 GiB one time. You must have approximately 260 GiB of free disk space.</p>
     </div>
-    <div class="steps">
-      <div class="step">
+    <div class="cg-steps">
+      <div class="cg-step">
         <div>
-          <h3>Run the tests</h3>
+          <h3 class="cg-h3">Run the tests</h3>
           <p>Build the image and run the test suite. The suite also starts the service one time with test data.</p>
-          <div class="term"><pre>docker-compose -f docker-compose.build.yml up --build api-test</pre></div>
+          <div class="cg-term"><pre>docker-compose -f docker-compose.build.yml up --build api-test</pre></div>
         </div>
       </div>
-      <div class="step">
+      <div class="cg-step">
         <div>
-          <h3>Prepare the Hash Set</h3>
+          <h3 class="cg-h3">Prepare the Hash Set</h3>
           <p>This command downloads the Release and the Delta releases. It does the three integrity checks and builds the index. It writes <code>rds.db</code> and the manifest into <code>./data</code>. Put the Delta releases in order, oldest first.</p>
-          <div class="term"><pre>make provision RELEASE=2026.03.1 DELTAS=<span class="s">"2026.06.1 2026.09.1"</span>
+          <div class="cg-term"><pre>make provision RELEASE=2026.03.1 DELTAS=<span class="s">"2026.06.1 2026.09.1"</span>
 make verify</pre></div>
         </div>
       </div>
-      <div class="step">
+      <div class="cg-step">
         <div>
-          <h3>Start the service</h3>
+          <h3 class="cg-h3">Start the service</h3>
           <p>Start the API on port 5000. Make sure that <code>/health</code> shows <code>"ready": true</code>. Then send the digests.</p>
-          <div class="term"><pre>docker-compose -f docker-compose.prod.yml up -d api
+          <div class="cg-term"><pre>docker-compose -f docker-compose.prod.yml up -d api
 curl -s localhost:5000/health</pre></div>
         </div>
       </div>
@@ -500,46 +263,46 @@ curl -s localhost:5000/health</pre></div>
   </div>
 </section>
 
-<section id="api">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">API</span>
-      <h2>API endpoints.</h2>
+<section class="cg-section" id="api">
+  <div class="cg-wrap">
+    <div class="cg-sec-head">
+      <span class="cg-eyebrow">API</span>
+      <h2 class="cg-h2">API endpoints.</h2>
     </div>
-    <div class="grid g3">
-      <div class="card">
-        <div class="ep"><span class="verb post">POST</span><code>/check</code></div>
+    <div class="cg-grid cg-g3">
+      <div class="cg-card">
+        <div class="cg-ep"><span class="cg-verb cg-verb--write">POST</span><code>/check</code></div>
         <p>Send one Algorithm and one or more Digests. The service returns one result for each digest: <code>known</code>, <code>unknown</code> or <code>invalid</code>.</p>
-        <div class="status-row"><span class="pill on">200</span><span class="pill off">4xx rejected</span><span class="pill off">503 not ready</span></div>
+        <div class="cg-status-row"><span class="cg-pill cg-pill--on">200</span><span class="cg-pill cg-pill--off">4xx rejected</span><span class="cg-pill cg-pill--off">503 not ready</span></div>
       </div>
-      <div class="card">
-        <div class="ep"><span class="verb">GET</span><code>/health</code></div>
+      <div class="cg-card">
+        <div class="cg-ep"><span class="cg-verb">GET</span><code>/health</code></div>
         <p>Shows the Set, the Release, the Delta releases, the final dbhash and a <code>ready</code> flag. Examine this data before you use the results.</p>
       </div>
-      <div class="card">
-        <div class="ep"><span class="verb">GET</span><code>/ping</code></div>
-        <p>Returns <code>{"result": "pong"}</code> when the service operates. This endpoint does not need a Hash Set.</p>
+      <div class="cg-card">
+        <div class="cg-ep"><span class="cg-verb">GET</span><code>/ping</code></div>
+        <p>Returns <code>{"result": "pong"}</code> when the service operates. This endpoint operates without a Hash Set.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section class="band">
-  <div class="wrap">
-    <h2>Operate your own service.</h2>
+<section class="cg-band cg-section">
+  <div class="cg-wrap">
+    <h2 class="cg-h2">Operate your own service.</h2>
     <p>cybagard does not supply a public server. You prepare and verify the data. You operate the service. The service records each lookup.</p>
-    <div class="cta">
-      <a class="btn btn-gold" href="https://github.com/cybagard/nsrllookup">Source on GitHub</a>
-      <a class="btn btn-ghost" href="https://github.com/cybagard/nsrllookup/tree/main/docs/adr">Read the ADRs</a>
+    <div class="cg-cta">
+      <a class="cg-btn cg-btn--gold" href="https://github.com/cybagard/nsrllookup">Source on GitHub</a>
+      <a class="cg-btn cg-btn--ghost" href="https://github.com/cybagard/nsrllookup/tree/main/docs/adr">Read the ADRs</a>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer>
-  <div class="wrap">
-    <a class="brand" href="https://github.com/cybagard"><img src="assets/mark-cream.png" alt="cybagard logo"><span>cybagard</span></a>
+<footer class="cg-footer">
+  <div class="cg-wrap">
+    <a class="cg-brand" href="https://github.com/cybagard"><img src="assets/cybagard/logos/mark-cream.png" alt="" width="30" height="30"><span>cybagard</span></a>
     <span>MIT licensed · Data: <a href="https://www.nist.gov/itl/ssd/software-quality-group/national-software-reference-library-nsrl">NIST NSRL</a> · <a href="https://github.com/cybagard/nsrllookup">cybagard/nsrllookup</a></span>
   </div>
 </footer>
