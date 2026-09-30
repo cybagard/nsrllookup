@@ -8,6 +8,7 @@ html:has(> .cg-root) { scroll-behavior: smooth; scroll-padding-top: var(--space-
 .cg-root :where(a) { color: inherit; }
 .cg-root :where(a):focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .cg-root :where(code, pre) { font-family: var(--font-mono); }
+.cg-root :where(cite) { font-style: normal; }
 .cg-root :where(:not(pre) > code) { font-size: .88em; padding: .1em .35em; border-radius: var(--radius-sm); background: rgba(197,176,129,.22); }
 
 /* Skip link */
