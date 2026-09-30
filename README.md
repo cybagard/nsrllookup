@@ -9,7 +9,7 @@ dataset** answered.
 
 [![Test](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/test.yml)
 [![Build & Scan](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml/badge.svg)](https://github.com/cybagard/nsrllookup/actions/workflows/build-image.yml)
-[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
 ## Why
 
@@ -272,4 +272,8 @@ the effort specs:
 
 ## License
 
-[MIT](LICENSE) © cybagard.
+[GPL-3.0-only](LICENSE) © cybagard.
+
+The agent skills vendored in `.agents/skills/` and `.claude/skills/` come from
+[`mattpocock/skills`](https://github.com/mattpocock/skills) (see `skills-lock.json`) and keep
+their own licence.
