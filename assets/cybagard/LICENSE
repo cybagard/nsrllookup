@@ -1,0 +1,52 @@
+cybagard design system
+Copyright (c) 2026 cybagard. All rights reserved.
+
+This licence covers the cybagard design system: the tokens, the component
+CSS, the templates, the scripts, the documentation, and the logo files in
+assets/logos/, including copies of these files that scripts/install.sh puts
+in an assets/cybagard/ directory.
+
+1. Permitted use
+
+   cybagard may use, change and publish these files without limit.
+
+   A copy of these files may be distributed only as part of a cybagard
+   project: a website, application or repository that cybagard publishes or
+   maintains. Such a copy must be unmodified, as installed by
+   scripts/install.sh, and must keep this licence file next to it.
+
+   Anyone may view, download and run a cybagard project that contains such a
+   copy, for the purpose of using that project.
+
+2. No other rights
+
+   No other right is granted. In particular, you may not copy, change or
+   reuse these files, or any part of them, in a project that is not a
+   cybagard project, and you may not use them to create a design that
+   imitates the cybagard brand.
+
+   When a cybagard project is released under an open-source licence, that
+   licence covers the project's own files. It does not cover the files under
+   this licence, which are distributed with the project as a separate work.
+
+3. Brand
+
+   The name "cybagard", the segmented "C" mark and the logo files are the
+   brand of cybagard. This licence grants no right to use them, except to
+   refer accurately to cybagard and its projects. Do not use them to name,
+   brand or promote another product, service or fork, or in a way that
+   suggests that cybagard endorses it.
+
+4. Third-party fonts
+
+   The fonts in fonts/ (Space Grotesk and JetBrains Mono) are not covered by
+   this licence. They are licensed under the SIL Open Font License 1.1; see
+   fonts/OFL-SpaceGrotesk.txt and fonts/OFL-JetBrainsMono.txt.
+
+5. No warranty
+
+   THESE FILES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED. IN NO EVENT SHALL CYBAGARD BE LIABLE FOR ANY CLAIM, DAMAGES OR
+   OTHER LIABILITY ARISING FROM THE FILES OR THEIR USE.
+
+For any other use, contact cybagard through https://github.com/cybagard.
